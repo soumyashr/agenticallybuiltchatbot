@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(lsof:*)",
+      "Bash(npm run:*)",
+      "Bash(sqlite3:*)",
+      "Bash(python3:*)",
+      "Bash(source:*)",
+      "Bash(curl:*)",
+      "Bash(/usr/sbin/screencapture:*)"
+    ]
+  }
+}

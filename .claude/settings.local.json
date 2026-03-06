@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3.11:*)",
+      "Bash(source:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(chmod +x:*)",
+      "Bash(cp:*)",
+      "Bash(docker:*)",
+      "Bash(bash:*)"
+    ]
+  }
+}

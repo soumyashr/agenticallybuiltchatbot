@@ -1,0 +1,520 @@
+# 04 — RAG_PIPELINE.md
+# For Claude Code: WRITE ALL CODE IN THIS FILE.
+# Build document_store.py, ingest.py, and tools.py.
+# Prerequisites: 03_BACKEND_CORE.md must be COMPLETE and VERIFIED.
+
+---
+
+## What This Layer Does
+
+```
+PDF uploaded by admin
+  → PyPDFLoader splits into pages
+  → RecursiveCharacterTextSplitter → chunks (1000 chars, 200 overlap)
+  → Each chunk tagged: { source, page, allowed_roles: ["admin","faculty"] }
+  → OpenAI embeds each chunk → 1536-dim float vector
+  → FAISS stores all vectors + metadata on disk
+  → At query time: embed question → cosine similarity → top k*4 chunks (over-fetch)
+  → Filter chunks: keep only where user_role in allowed_roles
+  → Trim to top-k results
+  → Per-session query dedup: if same query repeated, return cached results + nudge
+  → Return filtered text to LangChain agent
+```
+
+---
+
+## STEP 1 — document_store.py
+
+Write to `backend/app/document_store.py`:
+```python
+import sqlite3
+import json
+import logging
+from datetime import datetime
+
+log = logging.getLogger(__name__)
+DB_PATH = "documents.db"
+
+
+def init_db() -> None:
+    """Create documents table if it does not exist."""
+    con = sqlite3.connect(DB_PATH)
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS documents (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename      TEXT NOT NULL,
+            display_name  TEXT NOT NULL,
+            allowed_roles TEXT NOT NULL,
+            status        TEXT NOT NULL DEFAULT 'UPLOADED',
+            chunk_count   INTEGER NOT NULL DEFAULT 0,
+            file_size     INTEGER NOT NULL DEFAULT 0,
+            uploaded_at   TEXT NOT NULL DEFAULT (datetime('now')),
+            ingested_at   TEXT,
+            error_msg     TEXT
+        )
+    """)
+    con.commit()
+    con.close()
+    log.info("Documents DB initialised.")
+
+
+def _row_to_dict(row: tuple) -> dict:
+    cols = [
+        "id", "filename", "display_name", "allowed_roles",
+        "status", "chunk_count", "file_size",
+        "uploaded_at", "ingested_at", "error_msg",
+    ]
+    d = dict(zip(cols, row))
+    d["allowed_roles"] = json.loads(d["allowed_roles"])
+    return d
+
+
+def register_document(
+    filename: str,
+    display_name: str,
+    allowed_roles: list[str],
+    file_size: int,
+) -> int:
+    con = sqlite3.connect(DB_PATH)
+    cur = con.execute(
+        """INSERT INTO documents (filename, display_name, allowed_roles, file_size)
+           VALUES (?, ?, ?, ?)""",
+        (filename, display_name, json.dumps(allowed_roles), file_size),
+    )
+    doc_id = cur.lastrowid
+    con.commit()
+    con.close()
+    return doc_id
+
+
+def get_all_documents() -> list[dict]:
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute(
+        "SELECT * FROM documents ORDER BY uploaded_at DESC"
+    ).fetchall()
+    con.close()
+    return [_row_to_dict(r) for r in rows]
+
+
+def get_pending_documents() -> list[dict]:
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute(
+        "SELECT * FROM documents WHERE status = 'UPLOADED'"
+    ).fetchall()
+    con.close()
+    return [_row_to_dict(r) for r in rows]
+
+
+def get_ingested_documents() -> list[dict]:
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute(
+        "SELECT * FROM documents WHERE status = 'INGESTED'"
+    ).fetchall()
+    con.close()
+    return [_row_to_dict(r) for r in rows]
+
+
+def get_allowed_roles_map() -> dict[str, list[str]]:
+    """Returns { filename: [roles] } for all INGESTED documents."""
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute(
+        "SELECT filename, allowed_roles FROM documents WHERE status = 'INGESTED'"
+    ).fetchall()
+    con.close()
+    return {row[0]: json.loads(row[1]) for row in rows}
+
+
+def set_status_ingesting(doc_id: int) -> None:
+    _update_status(doc_id, "INGESTING")
+
+
+def set_status_ingested(doc_id: int, chunk_count: int) -> None:
+    con = sqlite3.connect(DB_PATH)
+    con.execute(
+        "UPDATE documents SET status='INGESTED', chunk_count=?, ingested_at=? WHERE id=?",
+        (chunk_count, datetime.utcnow().isoformat(), doc_id),
+    )
+    con.commit()
+    con.close()
+
+
+def set_status_failed(doc_id: int, error: str) -> None:
+    con = sqlite3.connect(DB_PATH)
+    con.execute(
+        "UPDATE documents SET status='FAILED', error_msg=? WHERE id=?",
+        (error, doc_id),
+    )
+    con.commit()
+    con.close()
+
+
+def delete_document(doc_id: int) -> None:
+    con = sqlite3.connect(DB_PATH)
+    con.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    con.commit()
+    con.close()
+
+
+def _update_status(doc_id: int, status: str) -> None:
+    con = sqlite3.connect(DB_PATH)
+    con.execute("UPDATE documents SET status=? WHERE id=?", (status, doc_id))
+    con.commit()
+    con.close()
+```
+
+---
+
+## STEP 2 — ingest.py
+
+Write to `backend/app/ingest.py`:
+```python
+import os
+import logging
+from functools import lru_cache
+
+from app.config import settings
+from app.document_store import (
+    get_pending_documents,
+    get_ingested_documents,
+    get_allowed_roles_map,
+    set_status_ingesting,
+    set_status_ingested,
+    set_status_failed,
+)
+
+log = logging.getLogger(__name__)
+
+
+# ── Embedding factory (lazy imports) ─────────────────────────
+
+def _build_embeddings():
+    provider = settings.embedding_provider.lower()
+    if provider == "openai":
+        from langchain_openai import OpenAIEmbeddings
+        return OpenAIEmbeddings(
+            model=settings.embedding_model,
+            openai_api_key=settings.openai_api_key,
+        )
+    elif provider == "ollama":
+        from langchain_ollama import OllamaEmbeddings
+        return OllamaEmbeddings(
+            model=settings.ollama_embed_model,
+            base_url=settings.ollama_base_url,
+        )
+    raise ValueError(f"Unknown EMBEDDING_PROVIDER: '{provider}'")
+
+
+# ── Vector store — cached in memory ─────────────────────────
+
+@lru_cache(maxsize=1)
+def get_vector_store():
+    """Load FAISS index from disk. Cached — one load per server lifetime."""
+    from langchain_community.vectorstores import FAISS
+    embeddings = _build_embeddings()
+    vs_path = settings.vector_store_dir
+    index_file = os.path.join(vs_path, "index.faiss")
+    if os.path.exists(index_file):
+        log.info("Loading FAISS index from disk...")
+        return FAISS.load_local(
+            vs_path, embeddings, allow_dangerous_deserialization=True
+        )
+    log.warning("No FAISS index found. Upload and ingest documents first.")
+    return None
+
+
+def reload_vector_store() -> None:
+    """Clear lru_cache so the next query loads the freshly built index."""
+    get_vector_store.cache_clear()
+    log.info("Vector store cache cleared.")
+
+
+# ── Ingest pipeline ──────────────────────────────────────────
+
+def run_pending() -> None:
+    """
+    Ingest all documents with status=UPLOADED.
+    Rebuilds the full FAISS index with existing + new chunks.
+    Called by POST /admin/documents/ingest.
+    """
+    pending = get_pending_documents()
+    if not pending:
+        log.info("No pending documents to ingest.")
+        return
+
+    all_chunks = _load_ingested_chunks()
+
+    for doc in pending:
+        doc_id   = doc["id"]
+        filename = doc["filename"]
+        roles    = doc["allowed_roles"]
+        filepath = os.path.join(settings.data_dir, filename)
+
+        if not os.path.exists(filepath):
+            set_status_failed(doc_id, f"File not found: {filepath}")
+            log.error(f"File missing: {filepath}")
+            continue
+
+        set_status_ingesting(doc_id)
+        try:
+            new_chunks = _load_pdf(filepath, filename, roles)
+            all_chunks.extend(new_chunks)
+            set_status_ingested(doc_id, len(new_chunks))
+            log.info(f"Ingested '{filename}': {len(new_chunks)} chunks")
+        except Exception as exc:
+            set_status_failed(doc_id, str(exc))
+            log.error(f"Failed to ingest '{filename}': {exc}")
+
+    if all_chunks:
+        _build_faiss(all_chunks)
+    reload_vector_store()
+
+
+def run_after_delete() -> None:
+    """
+    Rebuild FAISS index from all remaining INGESTED documents.
+    Called by DELETE /admin/documents/{id}.
+    """
+    chunks = _load_ingested_chunks()
+    if chunks:
+        _build_faiss(chunks)
+    else:
+        import shutil
+        vs_path = settings.vector_store_dir
+        if os.path.exists(vs_path):
+            shutil.rmtree(vs_path)
+            os.makedirs(vs_path, exist_ok=True)
+        log.info("All documents deleted — FAISS index removed.")
+    reload_vector_store()
+
+
+# ── Internal helpers ─────────────────────────────────────────
+
+def _load_ingested_chunks(exclude_filename: str | None = None) -> list:
+    """Re-chunk all currently INGESTED documents (for rebuild after delete)."""
+    ingested  = get_ingested_documents()
+    roles_map = get_allowed_roles_map()
+    all_chunks = []
+
+    for doc in ingested:
+        fname = doc["filename"]
+        if fname == exclude_filename:
+            continue
+        filepath = os.path.join(settings.data_dir, fname)
+        if not os.path.exists(filepath):
+            log.warning(f"Ingested doc missing from disk: {filepath}")
+            continue
+        roles  = roles_map.get(fname, [])
+        chunks = _load_pdf(filepath, fname, roles)
+        all_chunks.extend(chunks)
+
+    return all_chunks
+
+
+def _load_pdf(filepath: str, filename: str, allowed_roles: list) -> list:
+    """
+    Load a PDF, split into chunks, tag each chunk with RBAC metadata.
+    Returns list of LangChain Document objects.
+    """
+    from langchain_community.document_loaders import PyPDFLoader
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+    loader   = PyPDFLoader(filepath)
+    pages    = loader.load()
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+    )
+    chunks = splitter.split_documents(pages)
+
+    for chunk in chunks:
+        chunk.metadata["source"]        = filename
+        chunk.metadata["allowed_roles"] = allowed_roles  # RBAC enforcement key
+
+    return chunks
+
+
+def _build_faiss(chunks: list) -> None:
+    """Embed all chunks and persist FAISS index to disk."""
+    from langchain_community.vectorstores import FAISS
+
+    embeddings = _build_embeddings()
+    os.makedirs(settings.vector_store_dir, exist_ok=True)
+    vs = FAISS.from_documents(chunks, embeddings)
+    vs.save_local(settings.vector_store_dir)
+    log.info(f"FAISS index saved: {len(chunks)} total chunks.")
+```
+
+---
+
+## STEP 3 — tools.py
+
+Write to `backend/app/tools.py`:
+```python
+import json
+import logging
+from langchain.tools import Tool
+
+from app.config import settings
+from app.ingest import get_vector_store
+
+log = logging.getLogger(__name__)
+
+
+def _filter_by_role(docs: list, user_role: str) -> list:
+    """
+    Keep only chunks the user's role is allowed to see.
+    chunk.metadata["allowed_roles"] is a list: ["admin", "faculty"]
+    """
+    allowed = []
+    for doc in docs:
+        roles = doc.metadata.get("allowed_roles", [])
+        if isinstance(roles, str):
+            try:
+                roles = json.loads(roles)
+            except json.JSONDecodeError:
+                roles = []
+        if user_role in roles:
+            allowed.append(doc)
+    return allowed
+
+
+def _format_docs(docs: list) -> str:
+    if not docs:
+        return "No relevant information found in documents accessible to you."
+    parts = []
+    for i, doc in enumerate(docs, 1):
+        source = doc.metadata.get("source", "Unknown document")
+        page   = doc.metadata.get("page", "?")
+        parts.append(
+            f"[{i}] Source: {source}, Page: {page}\n{doc.page_content}"
+        )
+    return "\n---\n".join(parts)
+
+
+def make_search_tools(user_role: str) -> list[Tool]:
+    """
+    Returns a list containing the semantic_search tool,
+    pre-configured for the given user role.
+    Called once per session at session creation time.
+    """
+
+    _seen_queries: dict[str, str] = {}  # per-session dedup cache
+
+    def semantic_search(query: str) -> str:
+        # Break agent loops — if the exact query was already run,
+        # return the cached results with a strong nudge to answer.
+        if query in _seen_queries:
+            prev = _seen_queries[query]
+            if "No relevant information found" in prev:
+                return prev
+            return (
+                prev
+                + "\n\n---\n"
+                + "SYSTEM: These results were already returned. "
+                  "Write your Final Answer NOW summarising the document "
+                  "content above. Do NOT search again."
+            )
+
+        vs = get_vector_store()
+        if vs is None:
+            return (
+                "No documents have been ingested yet. "
+                "Please ask an administrator to upload and ingest documents."
+            )
+        # Over-fetch so role filtering still leaves enough results.
+        # Without this, restricted docs can dominate the top-k and
+        # crowd out documents the user is actually allowed to see.
+        fetch_k = settings.retriever_top_k * 4
+        raw_docs = vs.similarity_search(query, k=fetch_k)
+        filtered = _filter_by_role(raw_docs, user_role)[
+            : settings.retriever_top_k
+        ]
+        log.info(
+            f"Search '{query[:50]}...' "
+            f"raw={len(raw_docs)} filtered={len(filtered)} role={user_role}"
+        )
+        result = _format_docs(filtered)
+        _seen_queries[query] = result
+        return result
+
+    return [
+        Tool(
+            name="semantic_search",
+            func=semantic_search,
+            description=(
+                "Search Happiest Minds internal documents for relevant information. "
+                "Input should be a clear, specific search query. "
+                "Returns the most relevant document chunks accessible to the current user. "
+                "Use this tool to find answers — do not answer from memory."
+            ),
+        )
+    ]
+```
+
+---
+
+## STEP 4 — Update main.py startup
+
+Add `init_db` import and call to `backend/app/main.py` startup function.
+
+Change the startup function to:
+```python
+@app.on_event("startup")
+async def startup() -> None:
+    log.info("Starting Happiest Minds Knowledge Hub API...")
+    init_users_db()
+    from app.document_store import init_db
+    init_db()
+    log.info("Startup complete.")
+```
+
+Add this import at the top of main.py:
+```python
+# (init_db is imported inline in startup to avoid circular imports)
+```
+
+---
+
+## STEP 5 — Ingest Test Documents
+
+Place the 3 test PDFs into `backend/data/`:
+```
+backend/data/student_syllabus.pdf      ← all roles
+backend/data/feature_6_document.pdf   ← admin + faculty
+backend/data/feature_7_document.pdf   ← admin only
+```
+
+Then test ingest manually from Python:
+```python
+# Run from backend/ with .venv active
+import os; os.chdir("backend")
+from app.document_store import init_db, register_document
+from app.ingest import run_pending
+
+init_db()
+
+# Register all 3
+register_document("student_syllabus.pdf",    "Student Syllabus",    ["admin","faculty","student"], 0)
+register_document("feature_6_document.pdf",  "Feature 6 Document",  ["admin","faculty"],           0)
+register_document("feature_7_document.pdf",  "Feature 7 Document",  ["admin"],                     0)
+
+run_pending()
+print("Done")
+```
+
+---
+
+## VERIFICATION CHECKLIST
+# Run each check. Report PASS or FAIL. Fix all FAILs before moving to 05.
+
+- [ ] `backend/vector_store/index.faiss` file exists after running ingest
+- [ ] `backend/vector_store/index.pkl` file exists after running ingest
+- [ ] `backend/documents.db` exists and contains 3 rows after registration
+- [ ] All 3 documents show status=INGESTED in documents.db
+- [ ] Chunk count > 0 for all 3 documents
+- [ ] Each chunk has `allowed_roles` in its metadata (verify via Python: `vs = get_vector_store(); docs = vs.similarity_search("test", k=3); print(docs[0].metadata)`)
+- [ ] `allowed_roles` in chunk metadata is a list, not a string
+- [ ] Student role filter test: `_filter_by_role(docs, "student")` returns 0 results for feature_7 chunks
+- [ ] Faculty role filter test: `_filter_by_role(docs, "faculty")` returns 0 results for feature_7 chunks
+- [ ] Admin role filter test: `_filter_by_role(docs, "admin")` returns results for all 3 documents
+- [ ] Server restarts without errors after ingest

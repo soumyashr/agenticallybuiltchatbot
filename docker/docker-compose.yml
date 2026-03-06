@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: hm_backend
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      - DATA_DIR=/app/data
+      - VECTOR_STORE_DIR=/app/vector_store
+    volumes:
+      - pdf_data:/app/data
+      - vector_index:/app/vector_store
+      - sqlite_data:/app
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 25s
+    networks:
+      - hm_net
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: hm_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - hm_net
+
+volumes:
+  pdf_data:    { name: hm_pdf_data    }
+  vector_index:{ name: hm_vector_index }
+  sqlite_data: { name: hm_sqlite_data  }
+
+networks:
+  hm_net:
+    name: hm_network
+    driver: bridge

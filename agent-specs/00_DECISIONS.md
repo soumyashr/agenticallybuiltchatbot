@@ -1,0 +1,247 @@
+# 00 — DECISIONS.md
+# Agent Constitution — Read This First, Every Session
+
+## CRITICAL INSTRUCTION FOR CLAUDE CODE
+Read this file at the start of EVERY session before reading any other spec.
+Every decision here is LOCKED. Do not deviate. Do not ask for clarification on these items.
+If any other spec conflicts with this file, THIS FILE wins.
+
+---
+
+## Project Identity
+```
+Product name     : Happiest Minds Knowledge Hub
+Tagline          : The Mindful IT Company · AI-powered
+Company          : Happiest Minds Technologies
+Type             : Internal tool — Happiest Minds branded throughout
+Root path        : /Users/soumya.shrivastava/AgenticallyBuiltChatBot
+```
+
+---
+
+## Brand & Design System (Non-negotiable)
+```
+Primary Green    : #3AB54A   ← HM official brand green
+Green Hover      : #2E9640
+Green Light/Dim  : #E8F8EA
+Page Background  : #FFFFFF   ← Clean white (HM light theme)
+Card Background  : #F8F9FA   ← Light grey cards/panels
+Mid Surface      : #E8F8EA   ← Secondary panels, hover states
+Border           : #E2E8F0   ← Universal border color
+Text Primary     : #1A1A2E   ← Dark text on light backgrounds
+Text Muted       : #666666
+Text Body        : #334155
+Button Text      : #FFFFFF   ← White text on green buttons
+Error            : #EF4444
+Error Background : #FEF2F2
+Warning          : #F59E0B
+Info             : #3B82F6
+
+Sidebar          : White (#FFFFFF) background, #1A1A2E text, #666666 muted, #E2E8F0 border
+
+Font             : Inter (load from Google Fonts CDN)
+Font weights     : 300, 400, 500, 600, 700
+
+Role badge colors:
+  admin          : bg #3AB54A, text #0A1A0A
+  faculty        : bg #0F3460, text #FFFFFF
+  student        : bg transparent, text #3AB54A, border 1px solid #3AB54A
+
+Shadows (light theme):
+  shadowSm       : 0 1px 3px rgba(0,0,0,0.08)
+  shadowMd       : 0 4px 12px rgba(0,0,0,0.1)
+  shadowLg       : 0 8px 24px rgba(0,0,0,0.12)
+```
+
+---
+
+## Tech Stack (Locked — Zero Deviations)
+```
+OS               : Mac Apple Silicon M1/M2/M3 (arm64)
+Python           : 3.11
+FastAPI          : 0.111.0
+Uvicorn          : 0.29.0 (with standard extras)
+LangChain        : 0.2.1
+langchain-openai : 0.1.8
+langchain-ollama : 0.1.1
+langchain-community: 0.2.1
+FAISS            : faiss-cpu 1.8.0
+PyPDF            : 4.2.0
+PyJWT            : 2.8.0
+bcrypt           : 4.1.3
+pydantic-settings: 2.2.1
+python-multipart : 0.0.9
+aiofiles         : 23.2.1
+
+React            : 18
+Vite             : latest
+Styling          : Pure inline CSS — NO Tailwind, NO MUI, NO CSS files
+State            : React hooks only — NO Redux
+
+Docker base      : python:3.11-slim (arm64 compatible)
+Docker frontend  : node:20-alpine + nginx:alpine
+```
+
+---
+
+## LLM Provider (Switchable via .env)
+```
+Default          : LLM_PROVIDER=openai → ChatOpenAI(model="gpt-4o")
+Embeddings       : EMBEDDING_PROVIDER=openai → text-embedding-ada-002
+Fallback         : LLM_PROVIDER=ollama → ChatOllama(model=llama3.2)
+Enterprise       : LLM_PROVIDER=azure_openai → AzureChatOpenAI
+
+Rule             : All provider imports are LAZY (inside if/elif blocks)
+                   Only the active provider's package is imported at runtime
+```
+
+---
+
+## Roles (Locked — 3 roles, exact names)
+```
+admin            : Full access — all documents + admin panel
+faculty          : faculty + student documents — chat only
+student          : student documents only — chat only
+
+Seeded users (created on startup, never change):
+  username: admin     password: HMAdmin@2024    role: admin
+  username: faculty1  password: HMFaculty@2024  role: faculty
+  username: student1  password: HMStudent@2024  role: student
+```
+
+---
+
+## Test Documents (3 files — exact RBAC mapping)
+```
+File 1: student_syllabus.pdf
+  allowed_roles: ["admin", "faculty", "student"]
+
+File 2: feature_6_document.pdf
+  allowed_roles: ["admin", "faculty"]
+
+File 3: feature_7_document.pdf
+  allowed_roles: ["admin"]
+```
+
+---
+
+## API Contract (Frontend ↔ Backend — Locked)
+```
+POST   /auth/token                   → { access_token, token_type, username, role }
+POST   /chat                         → { answer, sources, reasoning_steps, session_id, role }
+POST   /chat/clear                   → { cleared: session_id }
+GET    /admin/documents              → { pending[], ingesting[], ingested[], failed[], total }
+POST   /admin/documents/upload       → { id, filename, display_name, allowed_roles, status }
+POST   /admin/documents/ingest       → { message, ingested, total_ingested }
+DELETE /admin/documents/{id}         → { deleted, filename }
+GET    /admin/documents/{id}/status  → { id, status, chunk_count, error_msg }
+GET    /health                       → { status: "ok" }
+
+Auth header format: Authorization: Bearer <jwt_token>
+Login format: multipart/form-data with fields: username, password
+```
+
+---
+
+## Folder Structure (Exact — Do Not Deviate)
+```
+/Users/soumya.shrivastava/AgenticallyBuiltChatBot/
+├── backend/
+│   ├── app/
+│   │   ├── __init__.py          (empty)
+│   │   ├── main.py
+│   │   ├── config.py
+│   │   ├── models.py
+│   │   ├── auth.py
+│   │   ├── agent.py
+│   │   ├── tools.py
+│   │   ├── ingest.py
+│   │   ├── document_store.py
+│   │   └── routers/
+│   │       ├── __init__.py      (empty)
+│   │       ├── auth_router.py
+│   │       ├── chat_router.py
+│   │       └── documents_router.py
+│   ├── data/                    (empty dir, .gitkeep)
+│   ├── vector_store/            (empty dir, .gitkeep)
+│   ├── requirements.txt
+│   ├── .env                     (copy from .env.example, fill API key)
+│   └── .env.example
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   ├── config/
+│   │   │   ├── theme.js
+│   │   │   └── constants.js
+│   │   ├── services/
+│   │   │   └── api.js
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx
+│   │   ├── hooks/
+│   │   │   ├── useAuth.js
+│   │   │   ├── useChat.js
+│   │   │   └── useDocuments.js
+│   │   └── components/
+│   │       ├── auth/
+│   │       │   └── LoginScreen.jsx
+│   │       ├── layout/
+│   │       │   ├── Header.jsx
+│   │       │   └── Sidebar.jsx
+│   │       ├── chat/
+│   │       │   ├── WelcomeScreen.jsx
+│   │       │   ├── MessageList.jsx
+│   │       │   ├── MessageBubble.jsx
+│   │       │   └── TypingIndicator.jsx
+│   │       ├── input/
+│   │       │   └── ChatInput.jsx
+│   │       └── admin/
+│   │           ├── AdminPanel.jsx
+│   │           ├── DocumentUpload.jsx
+│   │           └── DocumentList.jsx
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
+├── docker/
+│   ├── Dockerfile.backend
+│   ├── Dockerfile.frontend
+│   ├── docker-compose.yml
+│   ├── nginx.conf
+│   ├── deploy.sh
+│   ├── .dockerignore
+│   └── .env.example
+└── README.md
+```
+
+---
+
+## Agent Behaviour Rules
+```
+1. Create ALL files in the exact paths above — never invent new paths
+2. Run the server after creating backend files — fix any errors before reporting done
+3. Never use placeholder comments like "# add logic here" — write complete code
+4. Never truncate code — every function must be fully implemented
+5. After each spec, run the verification checklist and report pass/fail for each item
+6. If a checklist item fails — fix it before moving to the next spec
+7. Never mix concerns — one spec, one layer
+8. All colors must come from the DECISIONS.md brand system — never invent colors
+9. All function names must match exactly what is specified — no renaming
+10. Import order: stdlib → third-party → local app imports
+```
+
+---
+
+## RBAC Test Matrix (3 roles x 3 documents = 9 tests)
+```
+All 9 must pass before the app is considered complete:
+
+student → student_syllabus    : ALLOW (student can access)
+faculty → student_syllabus    : ALLOW (faculty can access)
+admin   → student_syllabus    : ALLOW (admin can access)
+student → Feature_6           : BLOCK (faculty+admin only)
+faculty → Feature_6           : ALLOW (faculty can access)
+admin   → Feature_6           : ALLOW (admin can access)
+student → Feature_7           : BLOCK (admin only)
+faculty → Feature_7           : BLOCK (admin only)
+admin   → Feature_7           : ALLOW (admin can access)
+```
