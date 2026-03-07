@@ -21,12 +21,13 @@ export default function LoginScreen({ onLogin, loading, error }) {
       <div style={{
         width: '45%', background: THEME.bgCard,
         display: 'flex', flexDirection: 'column',
-        justifyContent: 'center', padding: '60px 50px',
+        padding: '24px 50px',
         borderRight: `1px solid ${THEME.bgBorder}`,
       }}>
         <div style={{ marginBottom: 40 }}>
           <img src={hmLogo} alt="Happiest Minds" style={{ height: 48, objectFit: 'contain' }} />
         </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <h1 style={{
           fontSize: 36, fontWeight: 700, color: THEME.textLight,
           lineHeight: 1.2, marginBottom: 16,
@@ -48,6 +49,7 @@ export default function LoginScreen({ onLogin, loading, error }) {
               <span style={{ color: THEME.textMuted, fontSize: 13 }}>{f.text}</span>
             </div>
           ))}
+        </div>
         </div>
       </div>
 
