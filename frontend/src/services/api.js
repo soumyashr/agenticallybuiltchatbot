@@ -84,7 +84,7 @@ export async function deleteDocument(token, docId) {
 }
 
 export async function fetchMyDocuments(token) {
-  const res = await fetch(`${API_BASE}/admin/documents/my`, {
+  const res = await fetch(`${API_BASE}/documents/my`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to fetch my documents');

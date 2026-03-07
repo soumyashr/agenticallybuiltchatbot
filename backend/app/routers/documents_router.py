@@ -19,6 +19,7 @@ from app.config import settings
 
 log = logging.getLogger(__name__)
 router = APIRouter()
+public_router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 ALLOWED_ROLES = {"admin", "faculty", "student"}
@@ -186,7 +187,7 @@ def delete_doc(doc_id: int, admin: dict = Depends(require_admin)):
 
 # ── 5. My documents (any role) ────────────────────────────────
 
-@router.get("/documents/my")
+@public_router.get("/documents/my")
 def my_documents(user: dict = Depends(get_current_user)):
     """Return documents accessible to the current user's role."""
     role = user.get("role", "student")

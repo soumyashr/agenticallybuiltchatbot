@@ -37,7 +37,8 @@ async def startup() -> None:
 
 app.include_router(auth_router.router,      prefix="/auth",  tags=["Auth"])
 app.include_router(chat_router.router,                       tags=["Chat"])
-app.include_router(documents_router.router, prefix="/admin", tags=["Admin"])
+app.include_router(documents_router.router,        prefix="/admin", tags=["Admin"])
+app.include_router(documents_router.public_router,                  tags=["Documents"])
 
 
 @app.get("/health", tags=["Health"])

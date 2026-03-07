@@ -61,19 +61,14 @@ export default function Sidebar({ auth, onNewChat, onLogout, onAskQuestion }) {
     }}>
       {/* Brand */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: 7,
-          background: THEME.green, display: 'flex',
-          alignItems: 'center', justifyContent: 'center',
-          fontSize: 16, fontWeight: 700, color: '#0A1A0A', flexShrink: 0,
-        }}>H</div>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: THEME.sidebarText, lineHeight: 1.2 }}>
-            {BRAND.name}
-          </div>
-          <div style={{ fontSize: 10, color: THEME.sidebarMuted, lineHeight: 1.2 }}>
-            {BRAND.company}
-          </div>
+        <img
+          src={hmLogo}
+          alt="Happiest Minds"
+          style={{ height: 36, objectFit: 'contain', flexShrink: 0 }}
+        />
+        <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 13, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.3 }}>
+          <div>Happiest Minds</div>
+          <div>Knowledge Hub</div>
         </div>
       </div>
 
@@ -92,7 +87,7 @@ export default function Sidebar({ auth, onNewChat, onLogout, onAskQuestion }) {
       {/* Sample Questions */}
       {questions.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: '#009797', marginBottom: 8 }}>
+          <p style={{ fontSize: 10, fontWeight: 700, color: '#009797', marginBottom: 8, textTransform: 'uppercase' }}>
             Try asking...
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -150,11 +145,6 @@ export default function Sidebar({ auth, onNewChat, onLogout, onAskQuestion }) {
             cursor: 'pointer', fontFamily: THEME.fontBase,
           }}
         >Sign out</button>
-      </div>
-
-      {/* Logo */}
-      <div style={{ marginTop: 12, textAlign: 'center' }}>
-        <img src={hmLogo} alt="Happiest Minds" style={{ maxHeight: 40, objectFit: 'contain' }} />
       </div>
     </div>
   );
