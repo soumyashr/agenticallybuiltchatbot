@@ -1,8 +1,55 @@
+import { useState, useEffect } from 'react';
 import { THEME, ROLE_STYLES } from '../../config/theme';
 import { BRAND } from '../../config/constants';
+import { fetchMyDocuments } from '../../services/api';
+import hmLogo from '../../assets/hm_logo.png';
 
-export default function Sidebar({ auth, onNewChat, onLogout }) {
+function generateQuestions(docs) {
+  const questions = [];
+
+  for (const doc of docs) {
+    const name = doc.display_name;
+    if (name.includes('Syllabus')) {
+      questions.push(`What topics are in ${name}?`);
+    } else if (name.includes('Minutes')) {
+      questions.push(`What was discussed in ${name}?`);
+    } else if (name.includes('Manual')) {
+      questions.push(`What does ${name} cover?`);
+    } else if (name.includes('Protocol')) {
+      questions.push(`What is the ${name}?`);
+    } else if (name.includes('Blueprint')) {
+      questions.push(`What is the process in ${name}?`);
+    } else {
+      questions.push(`What is in ${name}?`);
+    }
+    if (questions.length >= 5) return questions.slice(0, 5);
+  }
+
+  // 2nd pass: Summarize
+  for (const doc of docs) {
+    questions.push(`Summarize ${doc.display_name}`);
+    if (questions.length >= 5) return questions.slice(0, 5);
+  }
+
+  // 3rd pass: Key points
+  for (const doc of docs) {
+    questions.push(`What are the key points in ${doc.display_name}?`);
+    if (questions.length >= 5) return questions.slice(0, 5);
+  }
+
+  return questions.slice(0, 5);
+}
+
+export default function Sidebar({ auth, onNewChat, onLogout, onAskQuestion }) {
   const roleStyle = ROLE_STYLES[auth?.role] || ROLE_STYLES.student;
+  const [questions, setQuestions] = useState([]);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    fetchMyDocuments(auth.token)
+      .then(docs => setQuestions(generateQuestions(docs)))
+      .catch(() => setQuestions([]));
+  }, [auth?.token]);
 
   return (
     <div style={{
@@ -38,9 +85,38 @@ export default function Sidebar({ auth, onNewChat, onLogout }) {
           background: THEME.green, color: THEME.buttonText,
           border: 'none', borderRadius: THEME.borderRadius,
           fontSize: 13, fontWeight: 600, cursor: 'pointer',
-          marginBottom: 24, fontFamily: THEME.fontBase,
+          marginBottom: 16, fontFamily: THEME.fontBase,
         }}
       >+ New Chat</button>
+
+      {/* Sample Questions */}
+      {questions.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: '#009797', marginBottom: 8 }}>
+            Try asking...
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {questions.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => onAskQuestion(q)}
+                style={{
+                  padding: '7px 10px',
+                  background: '#F0FAF0',
+                  color: '#009797',
+                  border: '1px solid #39B54A',
+                  borderRadius: 8,
+                  fontSize: 11,
+                  lineHeight: 1.3,
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  fontFamily: THEME.fontBase,
+                }}
+              >{q}</button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ flex: 1 }} />
 
@@ -76,9 +152,10 @@ export default function Sidebar({ auth, onNewChat, onLogout }) {
         >Sign out</button>
       </div>
 
-      <p style={{ marginTop: 12, textAlign: 'center', fontSize: 10, color: THEME.sidebarMuted }}>
-        {BRAND.tagline}
-      </p>
+      {/* Logo */}
+      <div style={{ marginTop: 12, textAlign: 'center' }}>
+        <img src={hmLogo} alt="Happiest Minds" style={{ maxHeight: 40, objectFit: 'contain' }} />
+      </div>
     </div>
   );
 }

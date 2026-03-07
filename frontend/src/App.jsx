@@ -30,7 +30,7 @@ function AppShell() {
       display: 'flex', height: '100vh', width: '100%',
       background: THEME.bgDeep, fontFamily: THEME.fontBase, overflow: 'hidden',
     }}>
-      <Sidebar auth={auth} onNewChat={newChat} onLogout={handleLogout} />
+      <Sidebar auth={auth} onNewChat={newChat} onLogout={handleLogout} onAskQuestion={send} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Header activeTab={activeTab} onTabChange={setActiveTab} isAdmin={isAdmin} />
         {activeTab === 'chat' ? (

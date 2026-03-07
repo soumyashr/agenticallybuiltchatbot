@@ -83,6 +83,14 @@ export async function deleteDocument(token, docId) {
   return res.json();
 }
 
+export async function fetchMyDocuments(token) {
+  const res = await fetch(`${API_BASE}/admin/documents/my`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to fetch my documents');
+  return res.json();
+}
+
 export async function pollDocumentStatus(token, docId) {
   const res = await fetch(`${API_BASE}/admin/documents/${docId}/status`, {
     headers: { Authorization: `Bearer ${token}` },

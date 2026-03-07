@@ -184,7 +184,26 @@ def delete_doc(doc_id: int, admin: dict = Depends(require_admin)):
     return {"deleted": doc_id, "filename": doc["filename"]}
 
 
-# ── 5. Status poll ────────────────────────────────────────────
+# ── 5. My documents (any role) ────────────────────────────────
+
+@router.get("/documents/my")
+def my_documents(user: dict = Depends(get_current_user)):
+    """Return documents accessible to the current user's role."""
+    role = user.get("role", "student")
+    docs = get_all_documents()
+    return [
+        {
+            "id": d["id"],
+            "display_name": d["display_name"],
+            "allowed_roles": d["allowed_roles"],
+            "chunk_count": d["chunk_count"],
+        }
+        for d in docs
+        if d["status"] == "INGESTED" and role in d.get("allowed_roles", [])
+    ]
+
+
+# ── 6. Status poll ────────────────────────────────────────────
 
 @router.get("/documents/{doc_id}/status")
 def get_document_status(doc_id: int, admin: dict = Depends(require_admin)):
