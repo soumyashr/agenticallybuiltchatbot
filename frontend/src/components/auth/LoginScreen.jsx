@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { THEME } from '../../config/theme';
 import { BRAND } from '../../config/constants';
+import hmLogo from '../../assets/hm_logo.png';
 
 export default function LoginScreen({ onLogin, loading, error }) {
   const [username, setUsername] = useState('');
@@ -23,18 +24,8 @@ export default function LoginScreen({ onLogin, loading, error }) {
         justifyContent: 'center', padding: '60px 50px',
         borderRight: `1px solid ${THEME.bgBorder}`,
       }}>
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 40,
-        }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 8,
-            background: THEME.green, display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            fontSize: 18, fontWeight: 700, color: '#0A1A0A',
-          }}>H</div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: THEME.textLight }}>
-            {BRAND.company}
-          </span>
+        <div style={{ marginBottom: 40 }}>
+          <img src={hmLogo} alt="Happiest Minds" style={{ height: 48, objectFit: 'contain' }} />
         </div>
         <h1 style={{
           fontSize: 36, fontWeight: 700, color: THEME.textLight,
@@ -58,10 +49,6 @@ export default function LoginScreen({ onLogin, loading, error }) {
             </div>
           ))}
         </div>
-        <p style={{
-          marginTop: 'auto', paddingTop: 40,
-          color: THEME.textMuted, fontSize: 11,
-        }}>{BRAND.tagline}</p>
       </div>
 
       {/* Right panel — login form */}
