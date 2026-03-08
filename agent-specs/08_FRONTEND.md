@@ -49,14 +49,15 @@ Overwrite `frontend/index.html`:
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <title>Happiest Minds Knowledge Hub</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@700&display=swap" rel="stylesheet" />
     <style>
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
       html, body, #root { height: 100%; width: 100%; overflow: hidden; }
-      body { font-family: 'Inter', sans-serif; background: #FFFFFF; color: #1A1A2E; }
+      body { font-family: 'Inter', sans-serif; background: #1A1A2E; color: #FFFFFF; }
     </style>
   </head>
   <body>
@@ -155,7 +156,9 @@ export const BRAND = {
   version: '1.0',
 };
 
-export const API_BASE = '';   // Empty — Vite proxy handles routing
+export const API_BASE = import.meta.env.VITE_API_URL || '';
+// Empty in dev (Vite proxy handles routing)
+// Set VITE_API_URL at build time for Docker/AWS deployments
 
 export const CHAT_CONFIG = {
   maxChars:        1000,
@@ -220,6 +223,15 @@ export async function fetchDocuments(token) {
   });
   if (!res.ok) throw new Error('Failed to fetch documents');
   return res.json();
+}
+
+// ── User Documents (any role) ────────────────────────────────
+export async function fetchMyDocuments(token) {
+  const res = await fetch(`${API_BASE}/documents/my`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to fetch my documents');
+  return res.json();   // [{ id, display_name, allowed_roles, chunk_count }]
 }
 
 export async function uploadDocument(token, file, displayName, allowedRoles) {
@@ -502,6 +514,7 @@ export function useDocuments(token) {
 import { useState } from 'react';
 import { THEME } from '../../config/theme';
 import { BRAND } from '../../config/constants';
+import hmLogo from '../../assets/hm_logo.png';
 
 export default function LoginScreen({ onLogin, loading, error }) {
   const [username, setUsername] = useState('');
@@ -521,22 +534,13 @@ export default function LoginScreen({ onLogin, loading, error }) {
       <div style={{
         width: '45%', background: THEME.bgCard,
         display: 'flex', flexDirection: 'column',
-        justifyContent: 'center', padding: '60px 50px',
+        padding: '24px 50px',
         borderRight: `1px solid ${THEME.bgBorder}`,
       }}>
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 40,
-        }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 8,
-            background: THEME.green, display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            fontSize: 18, fontWeight: 700, color: '#0A1A0A',
-          }}>H</div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: THEME.textLight }}>
-            {BRAND.company}
-          </span>
+        <div style={{ marginBottom: 40 }}>
+          <img src={hmLogo} alt="Happiest Minds" style={{ height: 48, objectFit: 'contain' }} />
         </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <h1 style={{
           fontSize: 36, fontWeight: 700, color: THEME.textLight,
           lineHeight: 1.2, marginBottom: 16,
@@ -559,10 +563,7 @@ export default function LoginScreen({ onLogin, loading, error }) {
             </div>
           ))}
         </div>
-        <p style={{
-          marginTop: 'auto', paddingTop: 40,
-          color: THEME.textMuted, fontSize: 11,
-        }}>{BRAND.tagline}</p>
+        </div>
       </div>
 
       {/* Right panel — login form */}
@@ -666,90 +667,29 @@ export default function LoginScreen({ onLogin, loading, error }) {
 ```
 
 ### src/components/layout/Sidebar.jsx
+
+**Current implementation** uses the HM logo image, fetches accessible documents via
+`GET /documents/my`, and generates dynamic "Try asking..." questions based on document names.
+
+Key features:
+- **Header**: HM logo image (36px) + "Happiest Minds" / "Knowledge Hub" in Montserrat bold white 13px
+- **Dynamic questions**: Fetches `/documents/my` on mount, generates questions via keyword matching
+  (Syllabus, Minutes, Manual, Protocol, Blueprint → contextual question templates)
+- **"Try asking..." label**: 10px, uppercase, bold, teal #009797
+- **Question cards**: #F0FAF0 bg, #009797 text, #39B54A border, 8px radius
+- **No tagline at bottom** (removed)
+- Accepts `onAskQuestion` prop from App.jsx (sends question to chat)
+
 ```jsx
+import { useState, useEffect } from 'react';
 import { THEME, ROLE_STYLES } from '../../config/theme';
 import { BRAND } from '../../config/constants';
+import { fetchMyDocuments } from '../../services/api';
+import hmLogo from '../../assets/hm_logo.png';
 
-export default function Sidebar({ auth, onNewChat, onLogout }) {
-  const roleStyle = ROLE_STYLES[auth?.role] || ROLE_STYLES.student;
-
-  return (
-    <div style={{
-      width: THEME.sidebarWidth, height: '100%',
-      background: THEME.sidebarBg,
-      borderRight: `1px solid ${THEME.sidebarBorder}`,
-      display: 'flex', flexDirection: 'column',
-      padding: '20px 16px', flexShrink: 0,
-    }}>
-      {/* Brand */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: 7,
-          background: THEME.green, display: 'flex',
-          alignItems: 'center', justifyContent: 'center',
-          fontSize: 16, fontWeight: 700, color: '#0A1A0A', flexShrink: 0,
-        }}>H</div>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: THEME.sidebarText, lineHeight: 1.2 }}>
-            {BRAND.name}
-          </div>
-          <div style={{ fontSize: 10, color: THEME.sidebarMuted, lineHeight: 1.2 }}>
-            {BRAND.company}
-          </div>
-        </div>
-      </div>
-
-      {/* New Chat */}
-      <button
-        onClick={onNewChat}
-        style={{
-          width: '100%', padding: '10px',
-          background: THEME.green, color: THEME.buttonText,
-          border: 'none', borderRadius: THEME.borderRadius,
-          fontSize: 13, fontWeight: 600, cursor: 'pointer',
-          marginBottom: 24, fontFamily: THEME.fontBase,
-        }}
-      >+ New Chat</button>
-
-      <div style={{ flex: 1 }} />
-
-      {/* Role badge + user */}
-      <div style={{
-        padding: '12px', background: THEME.bgCard,
-        borderRadius: THEME.borderRadius,
-        border: `1px solid ${THEME.sidebarBorder}`,
-      }}>
-        <div style={{
-          display: 'inline-flex', alignItems: 'center',
-          padding: '3px 10px', borderRadius: 20,
-          background: roleStyle.bg,
-          border: roleStyle.border || 'none',
-          marginBottom: 8,
-        }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: roleStyle.text, letterSpacing: '0.05em' }}>
-            {roleStyle.label}
-          </span>
-        </div>
-        <p style={{ fontSize: 13, fontWeight: 600, color: THEME.sidebarText, marginBottom: 2 }}>
-          {auth?.username}
-        </p>
-        <p style={{ fontSize: 11, color: THEME.sidebarMuted }}>{BRAND.company}</p>
-        <button
-          onClick={onLogout}
-          style={{
-            marginTop: 10, width: '100%', padding: '7px',
-            background: '#FFFFFF', border: `1px solid ${THEME.sidebarText}`,
-            borderRadius: 6, color: THEME.sidebarText, fontSize: 12,
-            cursor: 'pointer', fontFamily: THEME.fontBase,
-          }}
-        >Sign out</button>
-      </div>
-
-      <p style={{ marginTop: 12, textAlign: 'center', fontSize: 10, color: THEME.sidebarMuted }}>
-        {BRAND.tagline}
-      </p>
-    </div>
-  );
+// (see full source in frontend/src/components/layout/Sidebar.jsx)
+export default function Sidebar({ auth, onNewChat, onLogout, onAskQuestion }) {
+  // ... fetches documents, generates questions, renders sidebar
 }
 ```
 
@@ -1354,7 +1294,10 @@ npm run dev
 # Run each check. Report PASS or FAIL. Fix all FAILs before moving to 09.
 
 - [ ] Login page renders with two-panel layout — left info panel, right form
-- [ ] HM green #3AB54A is used for logo square, Sign In button, and brand accents
+- [ ] HM logo image (from `assets/hm_logo.png`) appears in login page top-left and sidebar header
+- [ ] Favicon (from `public/favicon.png`) is visible in browser tab
+- [ ] Montserrat font loads (used in sidebar brand text)
+- [ ] HM green #3AB54A is used for Sign In button and brand accents
 - [ ] Background is clean white #FFFFFF with light green accents #E8F8EA
 - [ ] Login with admin / HMAdmin@2024 → enters app showing ⚙ ADMIN badge (green bg, white text)
 - [ ] Login with faculty1 / HMFaculty@2024 → 👤 FACULTY badge (dark blue bg, white text)
@@ -1374,3 +1317,6 @@ npm run dev
 - [ ] Sidebar has white background with HM green accents and #E2E8F0 borders
 - [ ] All text readable — dark text on light backgrounds, proper contrast throughout
 - [ ] Chat input auto-resizes as user types (max 120px), resets to single line on send
+- [ ] Sidebar shows dynamic "Try asking..." questions based on user's accessible documents
+- [ ] Clicking a suggested question sends it to the chat
+- [ ] `fetchMyDocuments` in api.js calls `GET /documents/my` and returns filtered document list

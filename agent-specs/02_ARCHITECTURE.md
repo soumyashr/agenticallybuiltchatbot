@@ -20,10 +20,12 @@
 │                  FASTAPI                          │
 │  Port 8000 │ CORS enabled for :3000               │
 │                                                   │
-│  /auth/token  → issue JWT                         │
-│  /chat        → invoke agent                      │
-│  /admin/*     → document management (admin only)  │
-│  /health      → liveness check                    │
+│  /auth/token    → issue JWT                        │
+│  /chat          → invoke agent (with retry logic)  │
+│  /chat/clear    → clear session memory             │
+│  /documents/my  → user's accessible docs (any role)│
+│  /admin/*       → document management (admin only) │
+│  /health        → liveness check                   │
 │                                                   │
 │  Middleware: decode JWT → inject role into request │
 └──────┬───────────────────────┬────────────────────┘
@@ -31,9 +33,14 @@
 ┌──────▼──────┐    ┌───────────▼──────────────────┐
 │   SQLITE    │    │      LANGCHAIN REACT AGENT    │
 │             │    │                               │
-│  users.db   │    │  ReAct loop (max 5 iter):     │
+│  users.db   │    │  ReAct loop (max 7 iter):     │
 │  documents  │    │  Thought → Action →           │
 │  .db        │    │  Observation → Final Answer   │
+│             │    │                               │
+│             │    │  Retry logic (3 attempts):     │
+│             │    │  Hard errors → raise immediately│
+│             │    │  Soft errors → retry           │
+│             │    │  Exhausted → direct FAISS      │
 │             │    │                               │
 │  Path:      │    │  ConversationBufferWindow     │
 │  backend/   │    │  Memory (last 10 turns)       │
@@ -72,7 +79,7 @@
 2.  POST /chat { message, session_id } + Authorization: Bearer <jwt>
 3.  FastAPI: decode JWT → extract { username, role }
 4.  agent.chat(message, session_id, role) called
-5.  LangChain ReAct agent starts loop:
+5.  LangChain ReAct agent starts loop (with retry logic):
     a. Thought: what to search for
     b. Action: semantic_search tool called
     c. Tool: FAISS similarity_search → over-fetch k*4 chunks
@@ -80,7 +87,9 @@
     e. Observation: filtered chunks returned to agent
     f. Thought: synthesise answer
     g. Final Answer: generated with source citations
-6.  Return { answer, sources, reasoning_steps, session_id, role }
+    h. If parse failure (fallback phrase + no sources): retry (up to 3x)
+    i. If all retries fail: direct FAISS fallback (bypass agent, single LLM call)
+6.  Return { answer, sources, reasoning_steps, session_id, role, fallback_used, error_type }
 7.  React renders MessageBubble with source badge + step counter
 ```
 
@@ -111,16 +120,23 @@
 ## RBAC — Two Enforcement Layers
 
 ```
-Layer 1 — API Route Level:
-  /admin/* routes → require role == "admin" or return 403
+Layer 1 — API Route Level (JWT-based):
+  /admin/* routes → require role == "admin" (via require_admin dependency) or return 403
+  /documents/my → requires any authenticated user (via get_current_user dependency)
+  /chat → requires any authenticated user
+  JWT tamper protection: modified role claim fails signature verification → 401
 
-Layer 2 — Chunk Retrieval Level:
+Layer 2 — Chunk Retrieval Level (FAISS metadata):
+  Each chunk stored with metadata: { source, page, allowed_roles: ["admin","faculty"] }
   FAISS returns top k*4 chunks (over-fetch to prevent retrieval starvation)
   Filter: keep only chunks where user_role in chunk.metadata.allowed_roles
   Trim to top-k results
   Per-session query dedup: cached results returned with "write Final Answer NOW" nudge
   Pass filtered chunks to LLM
   If 0 chunks after filter → "No relevant information found"
+
+Both layers must pass for a user to see document content.
+Layer 1 alone does not prevent data leakage — Layer 2 is essential.
 ```
 
 ---

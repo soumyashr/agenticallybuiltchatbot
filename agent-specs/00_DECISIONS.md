@@ -38,8 +38,11 @@ Warning          : #F59E0B
 Info             : #3B82F6
 
 Sidebar          : White (#FFFFFF) background, #1A1A2E text, #666666 muted, #E2E8F0 border
+Sidebar Questions: #F0FAF0 background, #009797 (teal) text, #39B54A border, 8px radius
+Teal Accent      : #009797   ← Used for sidebar question labels and question text
 
-Font             : Inter (load from Google Fonts CDN)
+Font Primary     : Inter (load from Google Fonts CDN)
+Font Display     : Montserrat (bold 700, used for sidebar brand text)
 Font weights     : 300, 400, 500, 600, 700
 
 Role badge colors:
@@ -128,8 +131,9 @@ File 3: feature_7_document.pdf
 ## API Contract (Frontend ↔ Backend — Locked)
 ```
 POST   /auth/token                   → { access_token, token_type, username, role }
-POST   /chat                         → { answer, sources, reasoning_steps, session_id, role }
+POST   /chat                         → { answer, sources, reasoning_steps, session_id, role, fallback_used, error_type }
 POST   /chat/clear                   → { cleared: session_id }
+GET    /documents/my                 → [ { id, display_name, allowed_roles, chunk_count }, ... ]
 GET    /admin/documents              → { pending[], ingesting[], ingested[], failed[], total }
 POST   /admin/documents/upload       → { id, filename, display_name, allowed_roles, status }
 POST   /admin/documents/ingest       → { message, ingested, total_ingested }
@@ -139,6 +143,9 @@ GET    /health                       → { status: "ok" }
 
 Auth header format: Authorization: Bearer <jwt_token>
 Login format: multipart/form-data with fields: username, password
+
+Note: /documents/my is NOT under /admin — it is on the public_router
+and accessible to any authenticated user (used by sidebar for dynamic questions).
 ```
 
 ---
@@ -162,15 +169,21 @@ Login format: multipart/form-data with fields: username, password
 │   │       ├── auth_router.py
 │   │       ├── chat_router.py
 │   │       └── documents_router.py
+│   ├── tests/
+│   │   └── test_agent_logic.py  (43 unit tests)
 │   ├── data/                    (empty dir, .gitkeep)
 │   ├── vector_store/            (empty dir, .gitkeep)
 │   ├── requirements.txt
 │   ├── .env                     (copy from .env.example, fill API key)
 │   └── .env.example
 ├── frontend/
+│   ├── public/
+│   │   └── favicon.png          (HM logo favicon)
 │   ├── src/
 │   │   ├── App.jsx
 │   │   ├── main.jsx
+│   │   ├── assets/
+│   │   │   └── hm_logo.png     (Happiest Minds logo image)
 │   │   ├── config/
 │   │   │   ├── theme.js
 │   │   │   └── constants.js

@@ -7,7 +7,8 @@
 
 An internal AI knowledge assistant for Happiest Minds Technologies.
 Full stack: FastAPI + LangChain ReAct + FAISS + React 18.
-Happiest Minds brand: Green #3AB54A on White #FFFFFF (light theme).
+Happiest Minds brand: Green #3AB54A, Teal #009797, Inter + Montserrat fonts.
+Deployed on AWS App Runner.
 
 ---
 
@@ -118,7 +119,9 @@ If any of these three fail, something is wrong with either ingest metadata or th
 ## Brand Reminder (Applies to All UI Code)
 
 ```
-Primary green     : #3AB54A  (buttons, accents, badges, logo)
+Primary green     : #3AB54A  (buttons, accents, badges)
+Teal accent       : #009797  (sidebar question labels and text)
+Sidebar questions : #F0FAF0 bg, #39B54A border, 8px radius
 Background        : #FFFFFF  (page background — clean white HM light theme)
 Cards/panels      : #F8F9FA  (light grey)
 Mid/hover         : #E8F8EA  (green tint)
@@ -127,7 +130,26 @@ Text primary      : #1A1A2E  (dark text on light bg)
 Text muted        : #666666
 Button text       : #FFFFFF  (white on green buttons)
 Sidebar           : White (#FFFFFF) with #1A1A2E text
-Font              : Inter (loaded from Google Fonts)
+Logo              : HM logo image (assets/hm_logo.png) — used in login + sidebar
+Favicon           : public/favicon.png (copied from hm_logo.png)
+Font primary      : Inter (loaded from Google Fonts)
+Font display      : Montserrat bold 700 (sidebar brand text)
 No Tailwind       : Pure inline CSS only
 No CSS files      : All styles in JSX style props
+```
+
+---
+
+## Key Endpoints (Updated)
+
+```
+POST   /auth/token              → JWT token
+POST   /chat                    → Agent answer (with retry/fallback)
+POST   /chat/clear              → Clear session memory
+GET    /documents/my            → User's accessible documents (any role)
+GET    /admin/documents         → All documents (admin only)
+POST   /admin/documents/upload  → Upload PDF (admin only)
+POST   /admin/documents/ingest  → Ingest pending docs (admin only)
+DELETE /admin/documents/{id}    → Delete document (admin only)
+GET    /health                  → Liveness check
 ```

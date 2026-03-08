@@ -14,6 +14,62 @@ from app.tools import make_search_tools
 
 log = logging.getLogger(__name__)
 
+# ── Constants ─────────────────────────────────────────────────
+
+MAX_AGENT_RETRIES = 3
+
+_FALLBACK_PHRASES = (
+    "i could not find information",
+    "no information found",
+    "i don't have information",
+    "i was unable to find",
+    "could not find relevant",
+    "agent stopped due to",
+    "parsing error",
+    "invalid or incomplete response",
+)
+
+_AUTH_ERROR_PHRASES = (
+    "401",
+    "invalid_api_key",
+    "authenticationerror",
+    "insufficient_quota",
+    "429",
+    "rate_limit",
+)
+
+# ── Typed exceptions ─────────────────────────────────────────
+
+
+class AgentParseError(Exception):
+    """Raised when the agent fails to parse LLM output after retries."""
+
+
+class AgentRetrievalError(Exception):
+    """Raised when FAISS retrieval fails after retries."""
+
+
+class AgentAccessError(Exception):
+    """Raised on authentication/authorization errors from the LLM provider."""
+
+
+# ── Helper functions ─────────────────────────────────────────
+
+
+def _is_fallback_response(text: str) -> bool:
+    """Return True if the output contains any known fallback phrase."""
+    lower = text.lower()
+    return any(phrase in lower for phrase in _FALLBACK_PHRASES)
+
+
+def _has_sources(intermediate_steps: list[Any]) -> bool:
+    """Return True if any observation in the steps contains 'Source:'."""
+    for _action, observation in intermediate_steps:
+        if isinstance(observation, str) and "Source:" in observation:
+            return True
+    return False
+
+
 # ── In-memory session store ───────────────────────────────────
 # { session_id: { "executor": AgentExecutor, "role": Role } }
 _sessions: dict[str, dict] = {}
@@ -126,7 +182,7 @@ def _create_executor(role: Role) -> AgentExecutor:
         tools=tools,
         memory=memory,
         verbose=True,
-        max_iterations=settings.agent_max_iterations,
+        max_iterations=max(settings.agent_max_iterations, 7),
         early_stopping_method="force",   # Forces Final Answer on iteration limit
         handle_parsing_errors=True,
         return_intermediate_steps=True,
@@ -195,6 +251,85 @@ def _extract_sources(intermediate_steps: list[Any]) -> list[SourceDoc]:
     return sources
 
 
+# ── Direct FAISS fallback ────────────────────────────────────
+
+async def _direct_faiss_search(
+    message: str,
+    role: Role,
+) -> dict:
+    """
+    Last-resort fallback: bypass agent, call FAISS directly,
+    then synthesise an answer with a single LLM call.
+    """
+    log.warning("Using direct FAISS fallback for: %s", message[:80])
+    tools = make_search_tools(user_role=role.value)
+    search_tool = tools[0]
+
+    try:
+        search_result = search_tool.func(message)
+    except Exception as exc:
+        log.error("Direct FAISS search failed: %s", exc)
+        return {
+            "answer": "I could not find information on this topic in the documents accessible to you.",
+            "sources": [],
+            "reasoning_steps": 0,
+            "fallback_used": True,
+            "error_type": "retrieval_error",
+        }
+
+    if "Source:" not in search_result:
+        return {
+            "answer": "I could not find information on this topic in the documents accessible to you.",
+            "sources": [],
+            "reasoning_steps": 0,
+            "fallback_used": True,
+            "error_type": "no_match",
+        }
+
+    # Parse sources from the raw search result
+    sources: list[SourceDoc] = []
+    seen: set[str] = set()
+    for block in search_result.split("---"):
+        source_match = re.search(r"Source:\s*(.+?),\s*Page", block)
+        page_match   = re.search(r"Page:\s*(\d+)", block)
+        if not source_match:
+            continue
+        source_name = source_match.group(1).strip()
+        page        = int(page_match.group(1)) if page_match else None
+        key         = f"{source_name}:{page}"
+        if key not in seen:
+            seen.add(key)
+            lines   = block.strip().split("\n")
+            snippet = " ".join(lines[1:])[:200] + "…" if len(lines) > 1 else ""
+            sources.append(SourceDoc(source=source_name, page=page, snippet=snippet))
+
+    # Single LLM call to synthesise
+    llm = _build_llm()
+    synthesis_prompt = (
+        f"Based ONLY on the following document excerpts, answer the user's question.\n"
+        f"If the excerpts do not contain the answer, say so.\n"
+        f"Always cite sources as: Source: [filename], Page: [number]\n\n"
+        f"--- Document Excerpts ---\n{search_result}\n\n"
+        f"--- Question ---\n{message}\n\n"
+        f"Answer:"
+    )
+
+    try:
+        llm_response = llm.invoke(synthesis_prompt)
+        answer = llm_response.content if hasattr(llm_response, "content") else str(llm_response)
+    except Exception as exc:
+        log.error("LLM synthesis in fallback failed: %s", exc)
+        answer = "I found relevant documents but could not generate a summary. Please try again."
+
+    return {
+        "answer": answer,
+        "sources": [s.dict() for s in sources],
+        "reasoning_steps": 1,
+        "fallback_used": True,
+        "error_type": None,
+    }
+
+
 # ── Public chat interface ────────────────────────────────────
 
 async def chat(
@@ -204,22 +339,76 @@ async def chat(
 ) -> dict:
     """
     Main entry point. Returns dict matching ChatResponse model.
+    Retries on agent parse failures up to MAX_AGENT_RETRIES times.
+    Falls back to direct FAISS search if all retries are exhausted.
     """
-    executor     = get_or_create_session(session_id, role)
-    result       = executor.invoke({"input": message})
-    answer       = result.get("output", "I could not generate an answer.")
-    intermediate = result.get("intermediate_steps", [])
+    executor = get_or_create_session(session_id, role)
 
-    sources      = _extract_sources(intermediate)
+    last_answer = None
+    last_sources: list[SourceDoc] = []
+    last_steps = 0
 
-    # Handle force-stop default message
-    if "Agent stopped" in answer:
-        answer = "I could not find information on this topic in the documents accessible to you."
+    for attempt in range(1, MAX_AGENT_RETRIES + 1):
+        try:
+            result       = executor.invoke({"input": message})
+            answer       = result.get("output", "I could not generate an answer.")
+            intermediate = result.get("intermediate_steps", [])
+            sources      = _extract_sources(intermediate)
 
-    return {
-        "answer":          answer,
-        "session_id":      session_id,
-        "role":            role.value,
-        "sources":         [s.dict() for s in sources],
-        "reasoning_steps": len(intermediate),
-    }
+            # Handle force-stop default message
+            if "Agent stopped" in answer:
+                answer = "I could not find information on this topic in the documents accessible to you."
+
+            last_answer  = answer
+            last_sources = sources
+            last_steps   = len(intermediate)
+
+            # Clean response — return immediately
+            if not _is_fallback_response(answer):
+                return {
+                    "answer":          answer,
+                    "session_id":      session_id,
+                    "role":            role.value,
+                    "sources":         [s.dict() for s in sources],
+                    "reasoning_steps": len(intermediate),
+                    "fallback_used":   False,
+                    "error_type":      None,
+                }
+
+            # Fallback phrase but FAISS actually ran — genuine not-found
+            if _has_sources(intermediate):
+                return {
+                    "answer":          answer,
+                    "session_id":      session_id,
+                    "role":            role.value,
+                    "sources":         [s.dict() for s in sources],
+                    "reasoning_steps": len(intermediate),
+                    "fallback_used":   False,
+                    "error_type":      None,
+                }
+
+            # Fallback phrase and FAISS never ran — parse failure, retry
+            log.warning(
+                "Agent parse failure (attempt %d/%d): %s",
+                attempt, MAX_AGENT_RETRIES, answer[:100],
+            )
+
+        except Exception as exc:
+            exc_str = str(exc).lower()
+            # Auth/rate-limit errors — raise immediately, do not retry
+            if any(phrase in exc_str for phrase in _AUTH_ERROR_PHRASES):
+                log.error("Non-retryable error: %s", exc)
+                raise AgentAccessError(str(exc)) from exc
+
+            log.warning(
+                "Agent exception (attempt %d/%d): %s",
+                attempt, MAX_AGENT_RETRIES, exc,
+            )
+            last_answer = str(exc)
+
+    # All retries exhausted — fall back to direct FAISS search
+    log.warning("All %d retries exhausted, using direct FAISS fallback.", MAX_AGENT_RETRIES)
+    fallback_result = await _direct_faiss_search(message, role)
+    fallback_result["session_id"] = session_id
+    fallback_result["role"] = role.value
+    return fallback_result

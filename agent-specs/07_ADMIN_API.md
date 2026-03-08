@@ -5,7 +5,7 @@
 
 ---
 
-## 5 Endpoints to Build
+## 6 Endpoints to Build
 
 | Method | Path | Action |
 |--------|------|--------|
@@ -14,6 +14,7 @@
 | POST | /admin/documents/ingest | Ingest all UPLOADED documents |
 | DELETE | /admin/documents/{id} | Delete document + rebuild index |
 | GET | /admin/documents/{id}/status | Poll single document status |
+| GET | /documents/my | Return documents accessible to current user's role (any authenticated user) |
 
 ---
 
@@ -43,6 +44,7 @@ from app.config import settings
 
 log = logging.getLogger(__name__)
 router = APIRouter()
+public_router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 ALLOWED_ROLES = {"admin", "faculty", "student"}
@@ -208,7 +210,26 @@ def delete_doc(doc_id: int, admin: dict = Depends(require_admin)):
     return {"deleted": doc_id, "filename": doc["filename"]}
 
 
-# ── 5. Status poll ────────────────────────────────────────────
+# ── 5. My documents (any role) ────────────────────────────────
+
+@public_router.get("/documents/my")
+def my_documents(user: dict = Depends(get_current_user)):
+    """Return documents accessible to the current user's role."""
+    role = user.get("role", "student")
+    docs = get_all_documents()
+    return [
+        {
+            "id": d["id"],
+            "display_name": d["display_name"],
+            "allowed_roles": d["allowed_roles"],
+            "chunk_count": d["chunk_count"],
+        }
+        for d in docs
+        if d["status"] == "INGESTED" and role in d.get("allowed_roles", [])
+    ]
+
+
+# ── 6. Status poll ────────────────────────────────────────────
 
 @router.get("/documents/{doc_id}/status")
 def get_document_status(doc_id: int, admin: dict = Depends(require_admin)):
@@ -223,6 +244,16 @@ def get_document_status(doc_id: int, admin: dict = Depends(require_admin)):
         "chunk_count": doc["chunk_count"],
         "error_msg":   doc["error_msg"],
     }
+```
+
+**Note:** `public_router` is mounted in `main.py` without a prefix (not under `/admin`),
+so the endpoint is accessible at `GET /documents/my` to any authenticated user.
+The `router` is mounted with prefix `/admin`, so admin endpoints remain at `/admin/documents/*`.
+
+Registration in `main.py`:
+```python
+app.include_router(documents_router.router,        prefix="/admin", tags=["Admin"])
+app.include_router(documents_router.public_router,                  tags=["Documents"])
 ```
 
 ---
@@ -242,4 +273,8 @@ def get_document_status(doc_id: int, admin: dict = Depends(require_admin)):
 - [ ] `DELETE /admin/documents/{id}` removes record from `documents.db`
 - [ ] After delete of INGESTED doc, FAISS index is rebuilt (run a chat query to verify)
 - [ ] `DELETE /admin/documents/{id}` with faculty token → 403
-- [ ] All 5 endpoints appear in Swagger UI at `http://localhost:8000/docs`
+- [ ] `GET /documents/my` with any authenticated token → returns list of documents for that role
+- [ ] `GET /documents/my` with student token → returns only student-accessible documents
+- [ ] `GET /documents/my` with admin token → returns all documents
+- [ ] `GET /documents/my` with no token → 401
+- [ ] All 6 endpoints appear in Swagger UI at `http://localhost:8000/docs`

@@ -7,6 +7,7 @@
 
 ## What Gets Built
 
+### Option A — EC2 (original spec)
 ```
 Local Mac  →  docker build  →  ECR (image registry)
                                     ↓
@@ -14,6 +15,50 @@ Local Mac  →  docker build  →  ECR (image registry)
                               (pulls + runs containers)
                               nginx on port 80
                               HTTPS via Let's Encrypt
+```
+
+### Option B — AWS App Runner (current deployment)
+```
+Local Mac  →  docker build  →  ECR (image registry)
+                                    ↓
+                              AWS App Runner
+                              (fully managed, auto-scaling)
+                              HTTPS by default
+                              URL: https://gazfq7ai7a.ap-south-1.awsapprunner.com
+```
+
+### App Runner Backend Environment Variables
+The following env vars must be set in the App Runner service configuration:
+```
+OPENAI_API_KEY          ← required
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4o
+EMBEDDING_PROVIDER=openai
+EMBEDDING_MODEL=text-embedding-ada-002
+JWT_SECRET=<production-secret>
+DATA_DIR=data
+VECTOR_STORE_DIR=vector_store
+```
+
+### Frontend Build Arg
+The frontend Docker build must pass the backend URL as a build arg:
+```
+docker build --build-arg VITE_API_URL=https://<backend-url> ...
+```
+This is consumed in `constants.js`:
+```js
+export const API_BASE = import.meta.env.VITE_API_URL || '';
+```
+
+### Stateless Container Limitation
+App Runner containers are stateless. Documents uploaded via the admin panel
+(stored in `data/` and `vector_store/` directories) are lost on redeployment.
+To persist documents across deploys, use an external storage solution
+(e.g. EFS, S3 + re-ingest on startup, or a persistent EC2 deployment).
+
+CORS in `main.py` includes the App Runner URL:
+```python
+allow_origins=[..., "https://gazfq7ai7a.ap-south-1.awsapprunner.com"]
 ```
 
 ---
