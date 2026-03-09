@@ -11,3 +11,10 @@ backend/documents.db
 *.db
 .DS_Store
 dist/
+.agenticallybuiltchatbot_venv/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.claude/
