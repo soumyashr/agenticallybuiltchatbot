@@ -40,7 +40,7 @@
 │             │    │  Retry logic (3 attempts):     │
 │             │    │  Hard errors → raise immediately│
 │             │    │  Soft errors → retry           │
-│             │    │  Exhausted → direct FAISS      │
+│             │    │  Exhausted → direct vector store│
 │             │    │                               │
 │  Path:      │    │  ConversationBufferWindow     │
 │  backend/   │    │  Memory (last 10 turns)       │
@@ -50,23 +50,33 @@
                   │    RBAC-AWARE SEARCH TOOL     │
                   │                               │
                   │  semantic_search(query)       │
-                  │  → FAISS similarity search    │
+                  │  → vector store search        │
                   │    (over-fetch k*4 results)   │
                   │  → filter by allowed_roles    │
+                  │    (FAISS: client-side filter) │
+                  │    (Azure: OData filter)       │
                   │  → trim to top-k              │
                   │  → per-session query dedup    │
                   │  → return allowed chunks only │
                   └────────────┬─────────────────┘
                                │
                   ┌────────────▼─────────────────┐
-                  │           FAISS               │
+                  │     VECTOR STORE              │
+                  │  (switched by AI_PROVIDER)    │
+                  │                               │
+                  │  AI_PROVIDER=openai:          │
+                  │    FAISS (local disk)         │
+                  │    Loaded via @lru_cache      │
+                  │    backend/vector_store/      │
+                  │                               │
+                  │  AI_PROVIDER=azure_openai:    │
+                  │    Azure AI Search (cloud)    │
+                  │    Index + upsert on ingest   │
+                  │    OData RBAC filter on query │
                   │                               │
                   │  Each chunk has metadata:     │
                   │  { source, page,              │
                   │    allowed_roles: [...] }      │
-                  │                               │
-                  │  Loaded once via @lru_cache   │
-                  │  Stored in backend/vector_store│
                   └──────────────────────────────┘
 ```
 
@@ -82,13 +92,15 @@
 5.  LangChain ReAct agent starts loop (with retry logic):
     a. Thought: what to search for
     b. Action: semantic_search tool called
-    c. Tool: FAISS similarity_search → over-fetch k*4 chunks
+    c. Tool: vector store similarity_search → over-fetch k*4 chunks
+       (FAISS for openai, Azure AI Search for azure_openai)
     d. Tool: filter chunks where user role in allowed_roles → trim to top-k
+       (FAISS: client-side filter; Azure: OData filter on allowed_roles)
     e. Observation: filtered chunks returned to agent
     f. Thought: synthesise answer
     g. Final Answer: generated with source citations
     h. If parse failure (fallback phrase + no sources): retry (up to 3x)
-    i. If all retries fail: direct FAISS fallback (bypass agent, single LLM call)
+    i. If all retries fail: direct vector store fallback (bypass agent, single LLM call)
 6.  Return { answer, sources, reasoning_steps, session_id, role, fallback_used, error_type }
 7.  React renders MessageBubble with source badge + step counter
 ```
@@ -108,11 +120,12 @@
     a.  PyPDFLoader loads pages
     b.  RecursiveCharacterTextSplitter → chunks (1000 chars, 200 overlap)
     c.  Each chunk.metadata["allowed_roles"] = roles from documents.db
-    d.  OpenAI embeds each chunk → 1536-dim vector
-    e.  FAISS index rebuilt with ALL ingested chunks
+    d.  Embeddings generated (OpenAI or Azure OpenAI, per AI_PROVIDER)
+    e.  AI_PROVIDER=openai: FAISS index rebuilt with ALL ingested chunks
+        AI_PROVIDER=azure_openai: Azure AI Search index created + documents upserted
     f.  documents.db: status=INGESTED, chunk_count=N
-8.  get_vector_store.cache_clear() called
-9.  Next query loads fresh index
+8.  get_vector_store.cache_clear() called (FAISS path)
+9.  Next query loads fresh index / hits Azure AI Search
 ```
 
 ---
@@ -126,10 +139,11 @@ Layer 1 — API Route Level (JWT-based):
   /chat → requires any authenticated user
   JWT tamper protection: modified role claim fails signature verification → 401
 
-Layer 2 — Chunk Retrieval Level (FAISS metadata):
+Layer 2 — Chunk Retrieval Level (vector store metadata):
   Each chunk stored with metadata: { source, page, allowed_roles: ["admin","faculty"] }
-  FAISS returns top k*4 chunks (over-fetch to prevent retrieval starvation)
-  Filter: keep only chunks where user_role in chunk.metadata.allowed_roles
+  Vector store returns top k*4 chunks (over-fetch to prevent retrieval starvation)
+  AI_PROVIDER=openai: FAISS returns all, client-side filter by allowed_roles
+  AI_PROVIDER=azure_openai: Azure AI Search uses OData filter on allowed_roles
   Trim to top-k results
   Per-session query dedup: cached results returned with "write Final Answer NOW" nudge
   Pass filtered chunks to LLM
@@ -158,17 +172,23 @@ Rules:
 ## Provider Switching Architecture
 
 ```
-.env flag           Import used              Notes
-─────────────────── ──────────────────────── ─────────────────────
-LLM_PROVIDER=openai      ChatOpenAI          Default
-LLM_PROVIDER=ollama      ChatOllama          Free local
-LLM_PROVIDER=azure_openai AzureChatOpenAI    Enterprise
+A single AI_PROVIDER env var controls the entire AI stack:
+LLM, embeddings, and vector store are switched together.
 
-EMBEDDING_PROVIDER=openai  OpenAIEmbeddings  Default
-EMBEDDING_PROVIDER=ollama  OllamaEmbeddings  Free local
+AI_PROVIDER     LLM                  Embeddings              Vector Store
+──────────────  ───────────────────  ──────────────────────  ──────────────────
+openai          ChatOpenAI           OpenAIEmbeddings        FAISS (local)
+azure_openai    AzureChatOpenAI      AzureOpenAIEmbeddings   Azure AI Search
+
+Config field: settings.ai_provider (mapped from AI_PROVIDER env var)
+
+agent.py  → _build_llm() branches on settings.ai_provider
+ingest.py → _build_embeddings() branches on settings.ai_provider
+ingest.py → vector store: FAISS for openai, Azure AI Search for azure_openai
+tools.py  → semantic_search: Azure uses OData filter for RBAC, FAISS uses client-side
 
 All imports are LAZY — only active provider imported at runtime
-Switching = edit .env only, no code changes
+Switching = change AI_PROVIDER in .env only, no code changes
 ```
 
 ---

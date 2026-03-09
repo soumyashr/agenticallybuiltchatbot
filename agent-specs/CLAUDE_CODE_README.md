@@ -6,7 +6,7 @@
 ## You Are Building: Happiest Minds Knowledge Hub
 
 An internal AI knowledge assistant for Happiest Minds Technologies.
-Full stack: FastAPI + LangChain ReAct + FAISS + React 18.
+Full stack: FastAPI + LangChain ReAct + FAISS/Azure AI Search + React 18.
 Happiest Minds brand: Green #3AB54A, Teal #009797, Inter + Montserrat fonts.
 Deployed on AWS App Runner.
 
@@ -48,7 +48,7 @@ Deployed on AWS App Runner.
 | `01_PROJECT_OVERVIEW.md` | Read once. Context only — no code. |
 | `02_ARCHITECTURE.md` | Read once. Blueprint only — no code. |
 | `03_BACKEND_CORE.md` | **Write code.** FastAPI skeleton + auth. |
-| `04_RAG_PIPELINE.md` | **Write code.** FAISS + ingest + tools. |
+| `04_RAG_PIPELINE.md` | **Write code.** FAISS/Azure AI Search + ingest + tools. |
 | `05_AGENT.md`        | **Write code.** ReAct agent + sessions. |
 | `06_RBAC.md`         | **Write code.** Route guards + verify. |
 | `07_ADMIN_API.md`    | **Write code.** 5 admin endpoints. |

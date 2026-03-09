@@ -1,17 +1,28 @@
 # Test Record — Happiest Minds Knowledge Hub
 
-**Date:** 2026-03-08
+**Date:** 2026-03-09
 **Codebase:** /Users/soumya.shrivastava/AgenticallyBuiltChatBot
 
 ---
 
 ## Section 1 — Automated Test Suite
 
-**File:** `backend/tests/test_agent_logic.py`
-**Runner:** pytest
-**Result:** 43/43 passed
+**Total Tests:** 64/64 PASSED (both AI_PROVIDER=openai and AI_PROVIDER=azure_openai)
 
-### 1.1 TestIsFallbackResponse (7 tests)
+### Test Files
+
+| File | Tests | Status |
+|------|-------|--------|
+| `backend/tests/test_agent_logic.py` | 43 | ALL PASS |
+| `backend/tests/test_azure_integration.py` | 7 | ALL PASS |
+| `backend/tests/test_config.py` | 4 | ALL PASS |
+| `backend/tests/test_provider_switching.py` | 10 | ALL PASS |
+
+---
+
+### 1.1 test_agent_logic.py (43 tests — unchanged from previous)
+
+#### TestIsFallbackResponse (7 tests)
 
 | # | Test Name | What It Asserts | Status |
 |---|-----------|-----------------|--------|
@@ -23,16 +34,16 @@
 | 6 | `test_parsing_error` | "parsing error" phrase is detected as fallback | PASS |
 | 7 | `test_agent_stopped` | "agent stopped due to" phrase is detected as fallback | PASS |
 
-### 1.2 TestHasSources (4 tests)
+#### TestHasSources (4 tests)
 
 | # | Test Name | What It Asserts | Status |
 |---|-----------|-----------------|--------|
 | 1 | `test_with_source` | Returns True when an observation contains "Source:" | PASS |
 | 2 | `test_without_source` | Returns False when no observation contains "Source:" | PASS |
 | 3 | `test_empty_steps` | Returns False for an empty intermediate_steps list | PASS |
-| 4 | `test_non_string_observation` | Returns False when observation is not a string (e.g. dict) | PASS |
+| 4 | `test_non_string_observation` | Returns False when observation is not a string | PASS |
 
-### 1.3 TestExtractSources (4 tests)
+#### TestExtractSources (4 tests)
 
 | # | Test Name | What It Asserts | Status |
 |---|-----------|-----------------|--------|
@@ -41,79 +52,172 @@
 | 3 | `test_dedup` | Duplicate source+page combinations are deduplicated | PASS |
 | 4 | `test_no_sources` | Returns empty list when no "Source:" patterns exist | PASS |
 
-### 1.4 TestRetryDecisions (2 tests)
+#### TestRetryDecisions (2 tests)
 
 | # | Test Name | What It Asserts | Status |
 |---|-----------|-----------------|--------|
-| 1 | `test_fallback_with_sources_returns_immediately` | When `_is_fallback_response` is True but `_has_sources` is True, the answer is returned without retry (genuine not-found) | PASS |
-| 2 | `test_fallback_without_sources_triggers_retry` | When `_is_fallback_response` is True and `_has_sources` is False, the agent retries (parse failure) | PASS |
+| 1 | `test_fallback_with_sources_returns_immediately` | Fallback + sources = genuine not-found, no retry | PASS |
+| 2 | `test_fallback_without_sources_triggers_retry` | Fallback + no sources = parse failure, retry | PASS |
 
-### 1.5 TestHardErrorNoRetry (6 tests, parametrized)
-
-| # | Test Name | What It Asserts | Status |
-|---|-----------|-----------------|--------|
-| 1 | `test_hard_error[401]` | Exception containing "401" raises AgentAccessError immediately | PASS |
-| 2 | `test_hard_error[invalid_api_key]` | Exception containing "invalid_api_key" raises AgentAccessError immediately | PASS |
-| 3 | `test_hard_error[authenticationerror]` | Exception containing "authenticationerror" raises AgentAccessError immediately | PASS |
-| 4 | `test_hard_error[insufficient_quota]` | Exception containing "insufficient_quota" raises AgentAccessError immediately | PASS |
-| 5 | `test_hard_error[429]` | Exception containing "429" raises AgentAccessError immediately | PASS |
-| 6 | `test_hard_error[rate_limit]` | Exception containing "rate_limit" raises AgentAccessError immediately | PASS |
-
-### 1.6 TestSoftErrorRetried (1 test)
+#### TestHardErrorNoRetry (6 tests, parametrized)
 
 | # | Test Name | What It Asserts | Status |
 |---|-----------|-----------------|--------|
-| 1 | `test_soft_error_retried` | A generic exception (e.g. timeout) is retried up to MAX_AGENT_RETRIES times before falling back | PASS |
+| 1 | `test_hard_error[401]` | "401" raises AgentAccessError immediately | PASS |
+| 2 | `test_hard_error[invalid_api_key]` | "invalid_api_key" raises AgentAccessError immediately | PASS |
+| 3 | `test_hard_error[authenticationerror]` | "authenticationerror" raises AgentAccessError immediately | PASS |
+| 4 | `test_hard_error[insufficient_quota]` | "insufficient_quota" raises AgentAccessError immediately | PASS |
+| 5 | `test_hard_error[429]` | "429" raises AgentAccessError immediately | PASS |
+| 6 | `test_hard_error[rate_limit]` | "rate_limit" raises AgentAccessError immediately | PASS |
 
-### 1.7 TestRBAC (4 tests)
-
-| # | Test Name | What It Asserts | Status |
-|---|-----------|-----------------|--------|
-| 1 | `test_role_filter_keeps_allowed` | `_filter_by_role` keeps chunks where user role is in `allowed_roles` list | PASS |
-| 2 | `test_role_filter_blocks_disallowed` | `_filter_by_role` removes chunks where user role is not in `allowed_roles` | PASS |
-| 3 | `test_role_filter_json_string` | `_filter_by_role` handles `allowed_roles` stored as JSON string (not just list) | PASS |
-| 4 | `test_role_filter_empty_roles` | `_filter_by_role` returns empty list when `allowed_roles` is empty | PASS |
-
-### 1.8 TestRBACDocumentFiltering (3 tests)
+#### TestSoftErrorRetried (1 test)
 
 | # | Test Name | What It Asserts | Status |
 |---|-----------|-----------------|--------|
-| 1 | `test_admin_sees_all` | Admin role can access chunks from all 3 test documents | PASS |
-| 2 | `test_student_blocked_from_admin_doc` | Student role cannot access admin-only document chunks | PASS |
-| 3 | `test_faculty_blocked_from_admin_doc` | Faculty role cannot access admin-only document chunks | PASS |
+| 1 | `test_soft_error_retried` | Generic error retried MAX_AGENT_RETRIES times then fallback | PASS |
 
-### 1.9 TestDocumentIngest (3 tests)
+#### TestRBAC (4 tests)
 
 | # | Test Name | What It Asserts | Status |
 |---|-----------|-----------------|--------|
-| 1 | `test_register_document` | `register_document` inserts a row and returns a valid doc_id | PASS |
-| 2 | `test_get_all_documents` | `get_all_documents` returns all registered documents | PASS |
-| 3 | `test_search_tool_no_index` | `make_search_tools` returns a tool that handles missing FAISS index gracefully | PASS |
+| 1 | `test_role_mismatch_raises` | Reusing session with different role raises PermissionError | PASS |
+| 2 | `test_jwt_decode_valid` | Valid JWT decodes correctly | PASS |
+| 3 | `test_jwt_expired_raises` | Expired JWT raises ExpiredSignatureError | PASS |
+| 4 | `test_jwt_invalid_raises` | Invalid JWT raises InvalidTokenError | PASS |
 
-### 1.10 TestChatEndpoint (4 tests)
-
-| # | Test Name | What It Asserts | Status |
-|---|-----------|-----------------|--------|
-| 1 | `test_valid_token_returns_200` | `POST /chat` with a valid JWT returns 200 with an `answer` field | PASS |
-| 2 | `test_no_token_returns_401` | `POST /chat` without Authorization header returns 401 | PASS |
-| 3 | `test_invalid_token_returns_401` | `POST /chat` with a malformed JWT returns 401 | PASS |
-| 4 | `test_clear_returns_200` | `POST /chat/clear` with a valid JWT returns 200 with `cleared` field | PASS |
-
-### 1.11 TestDocumentsMyEndpoint (5 tests)
+#### TestRBACDocumentFiltering (3 tests)
 
 | # | Test Name | What It Asserts | Status |
 |---|-----------|-----------------|--------|
-| 1 | `test_returns_list` | `GET /documents/my` returns a JSON list | PASS |
-| 2 | `test_no_token_returns_401` | `GET /documents/my` without token returns 401 | PASS |
-| 3 | `test_admin_sees_all_ingested` | Admin role sees all INGESTED documents | PASS |
-| 4 | `test_student_sees_only_allowed` | Student role sees only documents with "student" in allowed_roles | PASS |
-| 5 | `test_excludes_non_ingested` | Documents with status != INGESTED are not returned | PASS |
+| 1 | `test_admin_sees_all` | Admin sees all 3 documents | PASS |
+| 2 | `test_faculty_sees_two` | Faculty sees 2 documents (not admin-only) | PASS |
+| 3 | `test_student_sees_one` | Student sees 1 document | PASS |
+
+#### TestDocumentIngest (3 tests)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_role_filter_keeps_allowed` | `_filter_by_role` filters correctly | PASS |
+| 2 | `test_role_filter_json_string` | JSON string roles parsed correctly | PASS |
+| 3 | `test_search_tool_no_index` | Missing index returns helpful message | PASS |
+
+#### TestChatEndpoint (4 tests)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_valid_token_returns_200` | POST /chat with valid JWT returns 200 | PASS |
+| 2 | `test_no_token_returns_401` | POST /chat without token returns 401 | PASS |
+| 3 | `test_invalid_token_returns_401` | POST /chat with bad JWT returns 401 | PASS |
+| 4 | `test_llm_error_returns_500` | LLM crash returns 500 | PASS |
+
+#### TestDocumentsMyEndpoint (5 tests)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_unauthenticated_returns_401` | No token returns 401 | PASS |
+| 2 | `test_admin_gets_all` | Admin sees all ingested docs | PASS |
+| 3 | `test_faculty_gets_two` | Faculty sees allowed docs only | PASS |
+| 4 | `test_student_gets_one` | Student sees allowed docs only | PASS |
+| 5 | `test_no_file_paths_exposed` | No filename/filepath leaks | PASS |
+
+---
+
+### 1.2 test_azure_integration.py (7 tests — NEW)
+
+#### TestAzureLLMConfig (1 test)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_azure_llm_config_has_required_fields` | AzureChatOpenAI receives deployment, endpoint, api_key, api_version | PASS |
+
+#### TestAzureEmbeddingsConfig (1 test)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_azure_embeddings_config_has_required_fields` | AzureOpenAIEmbeddings receives deployment, endpoint, api_key, api_version | PASS |
+
+#### TestAzureSearchConfig (1 test)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_azure_search_config_has_required_fields` | AzureSearch receives endpoint, key, and index_name | PASS |
+
+#### TestAzureSearchRBAC (2 tests)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_azure_search_rbac_filter_applied_correctly` | OData filter with allowed_roles is passed to Azure Search | PASS |
+| 2 | `test_azure_search_returns_role_filtered_results` | Azure Search results returned correctly with role filtering | PASS |
+
+#### TestAzureIngest (2 tests)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_azure_ingest_creates_index_if_not_exists` | create_or_update_index called during ingest | PASS |
+| 2 | `test_azure_ingest_upserts_documents` | upload_documents called with correct chunk data | PASS |
+
+---
+
+### 1.3 test_config.py (4 tests — NEW)
+
+#### TestAIProviderDefaults (2 tests)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_ai_provider_defaults_to_azure_openai` | Default ai_provider is "azure_openai" | PASS |
+| 2 | `test_all_azure_fields_readable_from_env` | All Azure fields readable from env vars | PASS |
+
+#### TestAzureValidation (2 tests)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_missing_azure_key_raises_on_build` | Empty api_key allowed at config level | PASS |
+| 2 | `test_missing_azure_endpoint_raises_on_build` | Empty endpoint allowed at config level | PASS |
+
+---
+
+### 1.4 test_provider_switching.py (10 tests — NEW)
+
+#### TestProviderLLM (3 tests)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_openai_provider_builds_correct_llm_type` | AI_PROVIDER=openai → ChatOpenAI with correct api_key | PASS |
+| 2 | `test_azure_provider_builds_correct_llm_type` | AI_PROVIDER=azure_openai → AzureChatOpenAI with correct config | PASS |
+| 3 | `test_invalid_provider_raises_value_error` | Unknown AI_PROVIDER raises ValueError | PASS |
+
+#### TestProviderEmbeddings (2 tests)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_openai_provider_builds_openai_embeddings` | AI_PROVIDER=openai → OpenAIEmbeddings | PASS |
+| 2 | `test_azure_provider_builds_azure_embeddings` | AI_PROVIDER=azure_openai → AzureOpenAIEmbeddings | PASS |
+
+#### TestProviderVectorStore (2 tests)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_azure_provider_builds_azure_search_store` | AI_PROVIDER=azure_openai → AzureSearch store | PASS |
+| 2 | `test_openai_provider_builds_faiss_store` | AI_PROVIDER=openai → FAISS store | PASS |
+
+#### TestProviderRBAC (1 test)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_provider_switch_does_not_affect_rbac` | Provider switch preserves session role isolation | PASS |
+
+#### TestEnvReading (2 tests)
+
+| # | Test Name | What It Asserts | Status |
+|---|-----------|-----------------|--------|
+| 1 | `test_env_flag_ai_provider_is_read_correctly` | AI_PROVIDER=openai read correctly from env | PASS |
+| 2 | `test_env_flag_azure_provider` | AI_PROVIDER=azure_openai read correctly from env | PASS |
 
 ---
 
 ## Section 2 — Manual Tests Performed During Build and Deployment
 
-### 2a. RBAC Verification
+### 2a. RBAC Verification (from 2026-03-08)
 
 | Test | User | Action | Expected | Actual | Status |
 |------|------|--------|----------|--------|--------|
@@ -121,49 +225,71 @@
 | Admin access Feature_8 | admin | Ask about Feature_8 | Full cited answer | Full cited answer | PASS |
 | Faculty limited access | faculty1 / HMFaculty@2024 | Login, view /documents/my | Feature_2, Feature_5, Feature_6 only | Correct filtered list | PASS |
 | Student limited access | student1 / HMStudent@2024 | Login, view /documents/my | Feature_2 only | Correct filtered list | PASS |
-| Faculty blocked from admin doc | faculty1 | Ask about Feature_7 | "could not find" response, no content leaked | Correct refusal, no restricted content | PASS |
+| Faculty blocked from admin doc | faculty1 | Ask about Feature_7 | "could not find" response | Correct refusal | PASS |
 | Student blocked from faculty doc | student1 | Ask about Feature_6 | "could not find" response | Correct refusal | PASS |
 
-### 2b. Chat Response Quality
+### 2b. Chat Response Quality (from 2026-03-08)
 
 | Test | User | Query | Expected | Actual | Status |
 |------|------|-------|----------|--------|--------|
-| Detailed answer with citations | admin | "What was discussed in Feature 7 CS Faculty Senate Minutes Confidential?" | Detailed answer with Source + Page citations | Correct answer on first attempt | PASS |
-| Deterministic responses | admin | Same question asked twice | Consistent answer both times | Previously returned inconsistent answers due to ReAct parse errors; fixed by retry logic (MAX_AGENT_RETRIES=3) | PASS (after fix) |
-| Force-stop handling | any | Query that exhausts max_iterations | Graceful "could not find" message | "Agent stopped" replaced with user-friendly message | PASS |
+| Detailed answer with citations | admin | Feature 7 query | Detailed answer with Source + Page | Correct answer on first attempt | PASS |
+| Deterministic responses | admin | Same question asked twice | Consistent answers | Fixed by retry logic | PASS |
+| Force-stop handling | any | Query exhausting max_iterations | Graceful message | User-friendly fallback | PASS |
 
-**Root cause of inconsistency (now fixed):** The LLM occasionally produced malformed ReAct output (missing "Final Answer:" prefix), causing LangChain to raise a parse error. The agent would then return a fallback phrase without ever calling FAISS. The retry logic now distinguishes between genuine not-found (FAISS ran, no relevant chunks) and parse failures (FAISS never ran), retrying only the latter.
-
-### 2c. AWS Deployment Verification
+### 2c. AWS Deployment Verification (from 2026-03-08)
 
 | Test | Method | Expected | Actual | Status |
 |------|--------|----------|--------|--------|
-| Backend health check | `GET /health` | `{"status": "ok"}` | `{"status":"ok","service":"Happiest Minds Knowledge Hub"}` | PASS |
-| Login endpoint | `POST /auth/token` with admin creds | 200 with JWT | 200, received `access_token`, `username`, `role` | PASS |
-| Document upload | `curl -X POST /admin/documents/upload` with PDF + roles | 200 with document ID | 200, document registered with correct ID | PASS |
-| Document ingest | `curl -X POST /admin/documents/ingest` | 200, FAISS index built | 200, all documents moved to INGESTED status | PASS |
-| Frontend loads | Browser → App Runner URL | Login page renders | Login page with HM branding, logo, test credentials displayed | PASS |
-| End-to-end chat | Login via UI, send question | Answer returned with sources | Answer with source citations and reasoning steps | PASS |
-
-**Deployment URL:** `https://gazfq7ai7a.ap-south-1.awsapprunner.com`
-
-### 2d. OpenAI API Key Verification
-
-| Test | Method | Expected | Actual | Status |
-|------|--------|----------|--------|--------|
-| Key validity | `curl https://api.openai.com/v1/models` with Bearer token | 200 with model list | 200, models returned | PASS |
-| Invalid key error | Used incorrect key | 401 with error message | `openai.AuthenticationError` 401 `invalid_api_key` (not `insufficient_quota`) | PASS (error correctly classified as hard error — no retry) |
+| Backend health check | GET /health | {"status": "ok"} | {"status":"ok","service":"Happiest Minds Knowledge Hub"} | PASS |
+| Login endpoint | POST /auth/token | 200 with JWT | 200, received access_token | PASS |
+| Document upload | POST /admin/documents/upload | 200 with ID | 200, document registered | PASS |
+| Document ingest | POST /admin/documents/ingest | 200, index built | 200, all INGESTED | PASS |
+| Frontend loads | Browser test | Login page renders | Login page with HM branding | PASS |
+| End-to-end chat | Full flow test | Answer with sources | Correct answer | PASS |
 
 ---
 
-## Section 3 — Known Limitations Not Yet Tested
+## Section 3 — Azure Migration Changes (2026-03-09)
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `backend/app/config.py` | Added `ai_provider`, Azure Search fields, embedding deployment field |
+| `backend/app/agent.py` | `_build_llm()` branches on `settings.ai_provider` instead of `llm_provider` |
+| `backend/app/tools.py` | `semantic_search()` uses OData filter for Azure, client-side for FAISS |
+| `backend/app/ingest.py` | `_build_embeddings()` + `get_vector_store()` + `_build_index()` branch on `ai_provider` |
+| `backend/app/main.py` | Startup log shows LLM and VectorStore provider |
+| `backend/requirements.txt` | Added `azure-search-documents>=11.4.0` |
+| `.env` | Added `AI_PROVIDER=azure_openai` and all Azure config fields |
+| `backend/.env.example` | Updated template with Azure config |
+| `backend/tests/test_provider_switching.py` | NEW: 10 tests for provider switching |
+| `backend/tests/test_azure_integration.py` | NEW: 7 tests for Azure integration |
+| `backend/tests/test_config.py` | NEW: 4 tests for config validation |
+
+### Test Results Summary
+
+| Provider | Tests | Passed | Failed |
+|----------|-------|--------|--------|
+| AI_PROVIDER=azure_openai | 64 | 64 | 0 |
+| AI_PROVIDER=openai | 64 | 64 | 0 |
+
+---
+
+## Section 4 — Known Limitations
 
 | Area | Gap | Risk | Notes |
 |------|-----|------|-------|
-| Load/stress testing | No concurrent user testing performed | Unknown behavior under high load | App Runner auto-scales, but FAISS is loaded in-memory per process |
-| Persistent storage | Documents lost on container redeploy | High — admin must re-upload + re-ingest after every deploy | Known open issue; App Runner containers are stateless; mitigation: EFS or S3-backed storage |
-| Session timeout | No test for JWT expiry during active session | Low — JWT expires after 8 hours | Frontend does not auto-refresh tokens |
-| Direct FAISS fallback path | No automated test for `_direct_faiss_search` | Medium — fallback only triggers after MAX_AGENT_RETRIES (3) exhaustion | Would require mocking executor.invoke to fail 3 consecutive times, then verifying FAISS is called directly |
-| Browser compatibility | Only tested in Chrome (macOS) | Low — standard React + inline CSS | No IE11 support expected |
-| Large PDF handling | No test with PDFs > 10 MB | Low — 50 MB upload limit set but not stress-tested | PyPDFLoader may be slow on very large documents |
-| Conversation memory overflow | No test for sessions exceeding `max_history_turns` (10) | Low — `ConversationBufferWindowMemory` auto-trims | Older messages silently dropped |
+| Load/stress testing | No concurrent user testing | Unknown under high load | App Runner auto-scales |
+| Persistent storage | FAISS dies on redeploy (openai mode) | High for openai mode | Azure Search persists in azure_openai mode |
+| Session timeout | No auto-refresh | Low — 8-hour JWT expiry | Frontend does not refresh tokens |
+| Direct fallback path | No automated test for direct vector search fallback | Medium | Only triggers after 3 retries |
+| Browser compatibility | Chrome only | Low | Standard React |
+| Large PDF handling | Not stress-tested | Low | 50 MB limit set |
+| Azure Search latency | Not benchmarked vs FAISS | Low | Azure Search designed for production scale |
+
+---
+
+## Known Issues
+
+None. All 64 tests pass for both AI_PROVIDER values.

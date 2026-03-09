@@ -12,7 +12,8 @@ Layer 1 — API Route Guard (FastAPI Depends):
   /admin/* routes → only role=="admin" allowed → else 403
 
 Layer 2 — Chunk Retrieval Guard (already in tools.py):
-  FAISS returns top-5 → filter by user_role in chunk.metadata.allowed_roles
+  Vector store returns top-k → filter by user_role in chunk.metadata.allowed_roles
+  (FAISS: client-side filter; Azure AI Search: OData filter on allowed_roles)
   LLM only sees chunks the user is authorised for
 ```
 

@@ -31,10 +31,15 @@ Local Mac  →  docker build  →  ECR (image registry)
 The following env vars must be set in the App Runner service configuration:
 ```
 OPENAI_API_KEY          ← required
-LLM_PROVIDER=openai
+AI_PROVIDER=azure_openai
 LLM_MODEL=gpt-4o
-EMBEDDING_PROVIDER=openai
 EMBEDDING_MODEL=text-embedding-ada-002
+AZURE_OPENAI_ENDPOINT=  ← required if AI_PROVIDER=azure_openai
+AZURE_OPENAI_DEPLOYMENT=
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=
+AZURE_SEARCH_ENDPOINT=  ← required if AI_PROVIDER=azure_openai
+AZURE_SEARCH_ADMIN_KEY=
+AZURE_SEARCH_INDEX=
 JWT_SECRET=<production-secret>
 DATA_DIR=data
 VECTOR_STORE_DIR=vector_store

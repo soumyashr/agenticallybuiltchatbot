@@ -159,7 +159,7 @@ def list_documents(admin: dict = Depends(require_admin)):
 def ingest_documents(admin: dict = Depends(require_admin)):
     """
     Ingest all UPLOADED documents.
-    Rebuilds the full FAISS index.
+    Rebuilds the full vector index (FAISS or Azure AI Search, per AI_PROVIDER).
     """
     pending = get_pending_documents()
     if not pending:
@@ -182,7 +182,7 @@ def ingest_documents(admin: dict = Depends(require_admin)):
 def delete_doc(doc_id: int, admin: dict = Depends(require_admin)):
     """
     Delete a document record from DB + its PDF file from disk.
-    If the document was INGESTED, rebuilds FAISS index without it.
+    If the document was INGESTED, rebuilds vector index (FAISS or Azure AI Search) without it.
     """
     docs = get_all_documents()
     doc  = next((d for d in docs if d["id"] == doc_id), None)
@@ -202,10 +202,10 @@ def delete_doc(doc_id: int, admin: dict = Depends(require_admin)):
     delete_document(doc_id)
     log.info(f"Deleted document record: id={doc_id}")
 
-    # Rebuild FAISS if the doc was part of the index
+    # Rebuild vector index if the doc was part of the index
     if was_ingested:
         run_after_delete()
-        log.info("FAISS index rebuilt after deletion.")
+        log.info("Vector index rebuilt after deletion.")
 
     return {"deleted": doc_id, "filename": doc["filename"]}
 
@@ -271,7 +271,7 @@ app.include_router(documents_router.public_router,                  tags=["Docum
 - [ ] `GET /admin/documents/{id}/status` returns correct status after ingest
 - [ ] `DELETE /admin/documents/{id}` removes file from `backend/data/`
 - [ ] `DELETE /admin/documents/{id}` removes record from `documents.db`
-- [ ] After delete of INGESTED doc, FAISS index is rebuilt (run a chat query to verify)
+- [ ] After delete of INGESTED doc, vector index is rebuilt (run a chat query to verify)
 - [ ] `DELETE /admin/documents/{id}` with faculty token → 403
 - [ ] `GET /documents/my` with any authenticated token → returns list of documents for that role
 - [ ] `GET /documents/my` with student token → returns only student-accessible documents

@@ -42,6 +42,7 @@ langchain-ollama==0.1.1
 langchain-community==0.2.1
 faiss-cpu==1.8.0
 pypdf==4.2.0
+azure-search-documents>=11.4.0
 ```
 
 Then run:
@@ -55,25 +56,28 @@ pip install -r requirements.txt
 
 Write to `backend/.env.example`:
 ```
+# ── AI Provider (single flag switches LLM + embeddings + vector store) ──
+AI_PROVIDER=azure_openai
+
 # ── LLM ──────────────────────────────────────
-LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o
 LLM_TEMPERATURE=0.1
 
 # ── Embeddings ────────────────────────────────
-EMBEDDING_PROVIDER=openai
 EMBEDDING_MODEL=text-embedding-ada-002
 
-# ── OpenAI ───────────────────────────────────
+# ── OpenAI (only if AI_PROVIDER=openai) ──────
 OPENAI_API_KEY=sk-your-key-here
 
-# ── Ollama (only if LLM_PROVIDER=ollama) ─────
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_EMBED_MODEL=nomic-embed-text
-
-# ── Azure (only if LLM_PROVIDER=azure_openai) ─
+# ── Azure OpenAI (only if AI_PROVIDER=azure_openai) ─
 AZURE_OPENAI_ENDPOINT=
 AZURE_OPENAI_DEPLOYMENT=
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=
+
+# ── Azure AI Search (only if AI_PROVIDER=azure_openai) ─
+AZURE_SEARCH_ENDPOINT=
+AZURE_SEARCH_ADMIN_KEY=
+AZURE_SEARCH_INDEX=
 
 # ── Auth ─────────────────────────────────────
 JWT_SECRET=AgenticallyBuiltChatBot-secret-change-in-production
@@ -110,16 +114,15 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
+    # AI Provider (single flag switches LLM + embeddings + vector store)
+    ai_provider: str = "openai"  # "openai" or "azure_openai"
+
     # LLM
-    llm_provider: str = "openai"
     llm_model: str = "gpt-4o"
     llm_temperature: float = 0.1
 
     # Embeddings
-    embedding_provider: str = "openai"
     embedding_model: str = "text-embedding-ada-002"
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_embed_model: str = "nomic-embed-text"
 
     # OpenAI
     openai_api_key: str = ""
@@ -127,6 +130,12 @@ class Settings(BaseSettings):
     # Azure OpenAI
     azure_openai_endpoint: str = ""
     azure_openai_deployment: str = ""
+    azure_openai_embedding_deployment: str = ""
+
+    # Azure AI Search
+    azure_search_endpoint: str = ""
+    azure_search_admin_key: str = ""
+    azure_search_index: str = ""
 
     # Auth
     jwt_secret: str = "AgenticallyBuiltChatBot-secret-change-in-production"

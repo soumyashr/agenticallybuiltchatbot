@@ -28,7 +28,15 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup() -> None:
+    from app.config import settings
     log.info("Starting Happiest Minds Knowledge Hub API...")
+    log.info("AI_PROVIDER: %s", settings.ai_provider)
+    if settings.ai_provider.lower() == "azure_openai":
+        log.info("LLM: Azure OpenAI")
+        log.info("VectorStore: Azure AI Search")
+    else:
+        log.info("LLM: OpenAI")
+        log.info("VectorStore: FAISS")
     init_users_db()
     from app.document_store import init_db
     init_db()

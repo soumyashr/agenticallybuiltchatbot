@@ -3,23 +3,36 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
+    # ── Master provider switch ───────────────────────────────
+    # "openai" → ChatOpenAI + OpenAIEmbeddings + FAISS
+    # "azure_openai" → AzureChatOpenAI + AzureOpenAIEmbeddings + Azure AI Search
+    ai_provider: str = "azure_openai"
+
     # LLM
-    llm_provider: str = "openai"
+    llm_provider: str = "openai"          # legacy — ignored when ai_provider is set
     llm_model: str = "gpt-4o"
     llm_temperature: float = 0.1
 
     # Embeddings
-    embedding_provider: str = "openai"
+    embedding_provider: str = "openai"    # legacy — ignored when ai_provider is set
     embedding_model: str = "text-embedding-ada-002"
     ollama_base_url: str = "http://localhost:11434"
     ollama_embed_model: str = "nomic-embed-text"
 
-    # OpenAI
+    # Direct OpenAI (used when ai_provider=openai)
     openai_api_key: str = ""
 
-    # Azure OpenAI
+    # Azure OpenAI (used when ai_provider=azure_openai)
+    azure_openai_api_key: str = ""
     azure_openai_endpoint: str = ""
     azure_openai_deployment: str = ""
+    azure_openai_embedding_deployment: str = "text-embedding-3-small"
+    azure_openai_api_version: str = "2024-08-01-preview"
+
+    # Azure AI Search (used when ai_provider=azure_openai)
+    azure_search_endpoint: str = ""
+    azure_search_admin_key: str = ""
+    azure_search_index: str = "hm-knowledge-hub"
 
     # Auth
     jwt_secret: str = "AgenticallyBuiltChatBot-secret-change-in-production"

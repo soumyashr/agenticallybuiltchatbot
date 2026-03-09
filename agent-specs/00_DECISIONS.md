@@ -68,7 +68,8 @@ LangChain        : 0.2.1
 langchain-openai : 0.1.8
 langchain-ollama : 0.1.1
 langchain-community: 0.2.1
-FAISS            : faiss-cpu 1.8.0
+FAISS            : faiss-cpu 1.8.0 (used when AI_PROVIDER=openai)
+azure-search-documents: >=11.4.0 (used when AI_PROVIDER=azure_openai)
 PyPDF            : 4.2.0
 PyJWT            : 2.8.0
 bcrypt           : 4.1.3
@@ -87,15 +88,20 @@ Docker frontend  : node:20-alpine + nginx:alpine
 
 ---
 
-## LLM Provider (Switchable via .env)
+## AI Provider (Switchable via .env — single flag controls entire stack)
 ```
-Default          : LLM_PROVIDER=openai → ChatOpenAI(model="gpt-4o")
-Embeddings       : EMBEDDING_PROVIDER=openai → text-embedding-ada-002
-Fallback         : LLM_PROVIDER=ollama → ChatOllama(model=llama3.2)
-Enterprise       : LLM_PROVIDER=azure_openai → AzureChatOpenAI
+AI_PROVIDER=openai        → ChatOpenAI + OpenAIEmbeddings + FAISS
+AI_PROVIDER=azure_openai  → AzureChatOpenAI + AzureOpenAIEmbeddings + Azure AI Search
+
+Default          : AI_PROVIDER=openai
+LLM (openai)     : ChatOpenAI(model="gpt-4o")
+Embeddings (openai): OpenAIEmbeddings(model="text-embedding-ada-002") + FAISS
+LLM (azure)      : AzureChatOpenAI(azure_deployment=...)
+Embeddings (azure): AzureOpenAIEmbeddings(azure_deployment=...) + Azure AI Search
 
 Rule             : All provider imports are LAZY (inside if/elif blocks)
                    Only the active provider's package is imported at runtime
+                   A single AI_PROVIDER flag switches LLM + embeddings + vector store together
 ```
 
 ---

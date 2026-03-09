@@ -78,7 +78,7 @@ _sessions: dict[str, dict] = {}
 # ── LLM factory (lazy imports) ───────────────────────────────
 
 def _build_llm():
-    provider = settings.llm_provider.lower()
+    provider = settings.ai_provider.lower()
 
     if provider == "openai":
         from langchain_openai import ChatOpenAI
@@ -89,27 +89,20 @@ def _build_llm():
             openai_api_key=settings.openai_api_key,
         )
 
-    elif provider == "ollama":
-        from langchain_ollama import ChatOllama
-        log.info(f"LLM: Ollama ({settings.llm_model})")
-        return ChatOllama(
-            model=settings.llm_model,
-            temperature=settings.llm_temperature,
-        )
-
     elif provider == "azure_openai":
         from langchain_openai import AzureChatOpenAI
-        log.info(f"LLM: Azure OpenAI ({settings.llm_model})")
+        log.info("LLM: Azure OpenAI (%s)", settings.azure_openai_deployment)
         return AzureChatOpenAI(
-            azure_deployment=settings.azure_openai_deployment or settings.llm_model,
+            azure_deployment=settings.azure_openai_deployment,
             azure_endpoint=settings.azure_openai_endpoint,
-            openai_api_key=settings.openai_api_key,
+            api_key=settings.azure_openai_api_key,
+            api_version=settings.azure_openai_api_version,
             temperature=settings.llm_temperature,
         )
 
     raise ValueError(
-        f"Unknown LLM_PROVIDER='{provider}'. "
-        "Valid values: 'openai', 'ollama', 'azure_openai'"
+        f"Unknown AI_PROVIDER='{provider}'. "
+        "Valid values: 'openai', 'azure_openai'"
     )
 
 

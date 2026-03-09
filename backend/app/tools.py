@@ -69,14 +69,26 @@ def make_search_tools(user_role: str) -> list[Tool]:
                 "No documents have been ingested yet. "
                 "Please ask an administrator to upload and ingest documents."
             )
-        # Over-fetch so role filtering still leaves enough results.
-        # Without this, restricted docs can dominate the top-k and
-        # crowd out documents the user is actually allowed to see.
-        fetch_k = settings.retriever_top_k * 4
-        raw_docs = vs.similarity_search(query, k=fetch_k)
-        filtered = _filter_by_role(raw_docs, user_role)[
-            : settings.retriever_top_k
-        ]
+
+        provider = settings.ai_provider.lower()
+
+        if provider == "azure_openai":
+            # Azure AI Search — use OData filter for RBAC
+            from langchain_community.vectorstores import AzureSearch
+            raw_docs = vs.similarity_search(
+                query,
+                k=settings.retriever_top_k,
+                filters=f"allowed_roles/any(r: r eq '{user_role}')",
+            )
+            filtered = raw_docs  # Azure handles filtering server-side
+        else:
+            # FAISS — client-side RBAC filtering
+            fetch_k = settings.retriever_top_k * 4
+            raw_docs = vs.similarity_search(query, k=fetch_k)
+            filtered = _filter_by_role(raw_docs, user_role)[
+                : settings.retriever_top_k
+            ]
+
         log.info(
             f"Search '{query[:50]}...' "
             f"raw={len(raw_docs)} filtered={len(filtered)} role={user_role}"

@@ -83,7 +83,8 @@ This is the product. Everything else supports this moment.
 | Chunk size | 1000 characters, 200 overlap |
 | Top-K retrieval | 5 chunks |
 | Conversation memory | Last 10 turns |
-| Agent max iterations | max(5, 7) with force stop + retry (3 attempts) + FAISS fallback |
+| Agent max iterations | max(5, 7) with force stop + retry (3 attempts) + vector store fallback |
+| Vector store | FAISS (AI_PROVIDER=openai) or Azure AI Search (AI_PROVIDER=azure_openai) |
 
 ---
 
