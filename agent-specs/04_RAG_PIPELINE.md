@@ -640,6 +640,33 @@ print("Done")
 
 ---
 
+## Deployment Prerequisites
+
+The App Runner IAM role (`apprunner-hm-instance-role`) does **NOT** have
+`dynamodb:CreateTable`. Before deploying:
+
+### 1. Create the table manually via AWS CLI
+
+```bash
+aws dynamodb create-table \
+  --table-name hm-documents \
+  --attribute-definitions AttributeName=id,AttributeType=S \
+  --key-schema AttributeName=id,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region ap-south-1
+```
+
+### 2. Add the table ARN to the IAM inline policy
+
+Add the table ARN to the `DynamoDBAccess` inline policy on
+`apprunner-hm-instance-role`:
+
+```
+arn:aws:dynamodb:ap-south-1:*:table/hm-documents
+```
+
+---
+
 ## VERIFICATION CHECKLIST
 # Run each check. Report PASS or FAIL. Fix all FAILs before moving to 05.
 

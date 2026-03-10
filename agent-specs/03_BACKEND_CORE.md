@@ -546,6 +546,32 @@ uvicorn app.main:app --reload --port 8000
 
 ---
 
+## Deployment Prerequisites — DynamoDB Tables
+
+The App Runner IAM role (`apprunner-hm-instance-role`) does **NOT** have
+`dynamodb:CreateTable`. Before deploying, for each DynamoDB table
+(`hm-documents`, `hm-feedback`, `hm-escalations`):
+
+1. **Create the table manually via AWS CLI:**
+   ```bash
+   aws dynamodb create-table \
+     --table-name <TABLE_NAME> \
+     --attribute-definitions AttributeName=id,AttributeType=S \
+     --key-schema AttributeName=id,KeyType=HASH \
+     --billing-mode PAY_PER_REQUEST \
+     --region ap-south-1
+   ```
+
+2. **Add the table ARN to the `DynamoDBAccess` inline policy** on
+   `apprunner-hm-instance-role`:
+   ```
+   arn:aws:dynamodb:ap-south-1:*:table/<TABLE_NAME>
+   ```
+
+See `10_AWS_DEPLOY.md` for the full IAM policy JSON.
+
+---
+
 ## VERIFICATION CHECKLIST
 # Run each check. Report PASS or FAIL. Fix all FAILs before moving to 04.
 
