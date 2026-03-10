@@ -43,6 +43,9 @@ langchain-community==0.2.1
 faiss-cpu==1.8.0
 pypdf==4.2.0
 azure-search-documents>=11.4.0
+azure-identity>=1.15.0
+boto3>=1.34.0
+moto[dynamodb]>=5.0.0
 ```
 
 Then run:
@@ -87,6 +90,10 @@ JWT_EXPIRE_HOURS=8
 # ── Agent ────────────────────────────────────
 AGENT_MAX_ITERATIONS=5
 AGENT_SYSTEM_PROMPT=You are Happiest Minds Knowledge Hub, an AI assistant for Happiest Minds Technologies internal documents. Use the semantic_search tool to find relevant information. Search once or twice maximum. Once you find relevant content, STOP searching and write your Final Answer immediately. Always cite the source document name and page number. If you cannot find information after two searches, say clearly: I could not find information on this topic in the documents accessible to you.
+
+# ── DynamoDB ─────────────────────────────────
+DYNAMO_TABLE=hm-documents
+DYNAMO_REGION=ap-south-1
 
 # ── Data ─────────────────────────────────────
 DATA_DIR=data
@@ -141,6 +148,10 @@ class Settings(BaseSettings):
     jwt_secret: str = "AgenticallyBuiltChatBot-secret-change-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_hours: int = 8
+
+    # DynamoDB
+    dynamo_table: str = "hm-documents"
+    dynamo_region: str = "ap-south-1"
 
     # Agent
     agent_max_iterations: int = 5
@@ -452,10 +463,19 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup() -> None:
+    from app.config import settings
     log.info("Starting Happiest Minds Knowledge Hub API...")
+    log.info("AI_PROVIDER: %s", settings.ai_provider)
+    if settings.ai_provider.lower() == "azure_openai":
+        log.info("LLM: Azure OpenAI")
+        log.info("VectorStore: Azure AI Search")
+    else:
+        log.info("LLM: OpenAI")
+        log.info("VectorStore: FAISS")
     init_users_db()
     from app.document_store import init_db
     init_db()
+    log.info("DocumentStore: DynamoDB table '%s' in %s", settings.dynamo_table, settings.dynamo_region)
     log.info("Startup complete.")
 
 

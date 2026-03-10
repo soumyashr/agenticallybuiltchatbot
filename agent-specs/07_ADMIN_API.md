@@ -80,7 +80,7 @@ async def upload_document(
     admin: dict = Depends(require_admin),
 ):
     """
-    Upload a PDF and register it in documents.db (status=UPLOADED).
+    Upload a PDF and register it in DynamoDB (status=UPLOADED).
     allowed_roles: JSON string e.g. '["admin","faculty"]'
     """
     # Validate file type
@@ -179,7 +179,7 @@ def ingest_documents(admin: dict = Depends(require_admin)):
 # ── 4. Delete ─────────────────────────────────────────────────
 
 @router.delete("/documents/{doc_id}")
-def delete_doc(doc_id: int, admin: dict = Depends(require_admin)):
+def delete_doc(doc_id: str, admin: dict = Depends(require_admin)):
     """
     Delete a document record from DB + its PDF file from disk.
     If the document was INGESTED, rebuilds vector index (FAISS or Azure AI Search) without it.
@@ -232,7 +232,7 @@ def my_documents(user: dict = Depends(get_current_user)):
 # ── 6. Status poll ────────────────────────────────────────────
 
 @router.get("/documents/{doc_id}/status")
-def get_document_status(doc_id: int, admin: dict = Depends(require_admin)):
+def get_document_status(doc_id: str, admin: dict = Depends(require_admin)):
     """Poll a single document's ingest status. Used by frontend during ingest."""
     docs = get_all_documents()
     doc  = next((d for d in docs if d["id"] == doc_id), None)
@@ -270,7 +270,7 @@ app.include_router(documents_router.public_router,                  tags=["Docum
 - [ ] `POST /admin/documents/ingest` → all UPLOADED docs move to INGESTED
 - [ ] `GET /admin/documents/{id}/status` returns correct status after ingest
 - [ ] `DELETE /admin/documents/{id}` removes file from `backend/data/`
-- [ ] `DELETE /admin/documents/{id}` removes record from `documents.db`
+- [ ] `DELETE /admin/documents/{id}` removes record from DynamoDB
 - [ ] After delete of INGESTED doc, vector index is rebuilt (run a chat query to verify)
 - [ ] `DELETE /admin/documents/{id}` with faculty token → 403
 - [ ] `GET /documents/my` with any authenticated token → returns list of documents for that role

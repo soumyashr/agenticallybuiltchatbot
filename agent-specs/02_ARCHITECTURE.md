@@ -31,19 +31,19 @@
 └──────┬───────────────────────┬────────────────────┘
        │                       │
 ┌──────▼──────┐    ┌───────────▼──────────────────┐
-│   SQLITE    │    │      LANGCHAIN REACT AGENT    │
+│   DATA      │    │      LANGCHAIN REACT AGENT    │
 │             │    │                               │
 │  users.db   │    │  ReAct loop (max 7 iter):     │
-│  documents  │    │  Thought → Action →           │
-│  .db        │    │  Observation → Final Answer   │
-│             │    │                               │
-│             │    │  Retry logic (3 attempts):     │
-│             │    │  Hard errors → raise immediately│
-│             │    │  Soft errors → retry           │
+│  (SQLite)   │    │  Thought → Action →           │
+│             │    │  Observation → Final Answer   │
+│  documents  │    │                               │
+│  (DynamoDB) │    │  Retry logic (3 attempts):     │
+│  table:     │    │  Hard errors → raise immediately│
+│  hm-documents│    │  Soft errors → retry           │
 │             │    │  Exhausted → direct vector store│
 │             │    │                               │
-│  Path:      │    │  ConversationBufferWindow     │
-│  backend/   │    │  Memory (last 10 turns)       │
+│             │    │  ConversationBufferWindow     │
+│             │    │  Memory (last 10 turns)       │
 └─────────────┘    └───────────┬────────────────────┘
                                │
                   ┌────────────▼─────────────────┐
@@ -113,7 +113,7 @@
 1.  Admin uploads PDF via DocumentUpload component
 2.  POST /admin/documents/upload { file, display_name, allowed_roles }
 3.  FastAPI: verify admin role, save to backend/data/<filename>
-4.  INSERT into documents.db: status=UPLOADED
+4.  DynamoDB put_item: status=UPLOADED (table: hm-documents)
 5.  Admin clicks "Ingest Now" button
 6.  POST /admin/documents/ingest
 7.  For each UPLOADED document:
@@ -123,7 +123,7 @@
     d.  Embeddings generated (OpenAI or Azure OpenAI, per AI_PROVIDER)
     e.  AI_PROVIDER=openai: FAISS index rebuilt with ALL ingested chunks
         AI_PROVIDER=azure_openai: Azure AI Search index created + documents upserted
-    f.  documents.db: status=INGESTED, chunk_count=N
+    f.  DynamoDB update_item: status=INGESTED, chunk_count=N
 8.  get_vector_store.cache_clear() called (FAISS path)
 9.  Next query loads fresh index / hits Azure AI Search
 ```

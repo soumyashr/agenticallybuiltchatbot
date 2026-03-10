@@ -7,11 +7,17 @@ All tests use unittest.mock — no real API calls are made.
 """
 from __future__ import annotations
 
+import os
 import pytest
 from unittest.mock import patch, MagicMock
+from moto import mock_aws
 
 from app.models import Role
 from app.agent import _sessions
+
+os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
+os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
+os.environ.setdefault("AWS_DEFAULT_REGION", "ap-south-1")
 
 
 # ── Helpers ──────────────────────────────────────────────────
@@ -207,3 +213,76 @@ class TestEnvReading:
         from app.config import Settings
         s = Settings()
         assert s.ai_provider == "azure_openai"
+
+
+# ═══════════════════════════════════════════════════════════════
+# Provider switching — OpenAI uses FAISS, not Azure Search
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestOpenAIProviderUsesCorrectStack:
+    """Verify that AI_PROVIDER=openai never touches Azure services."""
+
+    @patch("app.ingest.settings", _make_settings(ai_provider="openai"))
+    @patch("app.ingest._build_embeddings")
+    @patch("os.path.exists", return_value=True)
+    def test_openai_provider_uses_faiss_not_azure_search(self, mock_exists, mock_embed):
+        """When AI_PROVIDER=openai, get_vector_store() loads FAISS, not AzureSearch."""
+        mock_embed.return_value = MagicMock()
+        with patch("langchain_community.vectorstores.FAISS") as MockFAISS, \
+             patch("langchain_community.vectorstores.AzureSearch") as MockAzSearch:
+            MockFAISS.load_local.return_value = MagicMock()
+            from app.ingest import get_vector_store
+            get_vector_store.cache_clear()
+            get_vector_store()
+            MockFAISS.load_local.assert_called_once()
+            MockAzSearch.assert_not_called()
+            get_vector_store.cache_clear()
+
+    @patch("app.ingest.settings", _make_settings(ai_provider="openai"))
+    def test_openai_provider_uses_openai_embeddings_not_azure(self):
+        """When AI_PROVIDER=openai, _build_embeddings() uses OpenAIEmbeddings, not Azure."""
+        with patch("langchain_openai.OpenAIEmbeddings") as MockOAI, \
+             patch("langchain_openai.AzureOpenAIEmbeddings") as MockAzEmbed:
+            MockOAI.return_value = MagicMock()
+            from app.ingest import _build_embeddings
+            _build_embeddings()
+            MockOAI.assert_called_once()
+            MockAzEmbed.assert_not_called()
+
+
+# ═══════════════════════════════════════════════════════════════
+# Provider switching does not affect DynamoDB document store
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestProviderDocumentStoreIndependence:
+    """DynamoDB document_store works regardless of AI_PROVIDER value."""
+
+    def test_switching_provider_does_not_break_document_store(self):
+        """document_store functions work with AI_PROVIDER=openai."""
+        with mock_aws():
+            import app.document_store as ds
+            ds._table = None
+            ds.init_db()
+            doc_id = ds.register_document("test.pdf", "Test", ["admin"], 100)
+            docs = ds.get_all_documents()
+            assert len(docs) == 1
+            assert docs[0]["id"] == doc_id
+            ds._table = None
+
+    @patch.dict("os.environ", {"AI_PROVIDER": "openai"}, clear=False)
+    def test_dynamo_works_regardless_of_ai_provider(self):
+        """DynamoDB operations succeed with AI_PROVIDER=openai (not azure_openai)."""
+        with mock_aws():
+            import app.document_store as ds
+            ds._table = None
+            ds.init_db()
+            d1 = ds.register_document("a.pdf", "A", ["admin", "student"], 50)
+            ds.set_status_ingested(d1, 10)
+            ingested = ds.get_ingested_documents()
+            assert len(ingested) == 1
+            assert ingested[0]["chunk_count"] == 10
+            roles_map = ds.get_allowed_roles_map()
+            assert roles_map["a.pdf"] == ["admin", "student"]
+            ds._table = None

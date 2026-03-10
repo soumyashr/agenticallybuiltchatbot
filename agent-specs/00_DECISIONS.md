@@ -70,6 +70,9 @@ langchain-ollama : 0.1.1
 langchain-community: 0.2.1
 FAISS            : faiss-cpu 1.8.0 (used when AI_PROVIDER=openai)
 azure-search-documents: >=11.4.0 (used when AI_PROVIDER=azure_openai)
+azure-identity       : >=1.15.0 (used when AI_PROVIDER=azure_openai)
+boto3                : >=1.34.0 (DynamoDB document metadata store)
+moto[dynamodb]       : >=5.0.0 (dev — DynamoDB test mocks)
 PyPDF            : 4.2.0
 PyJWT            : 2.8.0
 bcrypt           : 4.1.3
@@ -93,7 +96,7 @@ Docker frontend  : node:20-alpine + nginx:alpine
 AI_PROVIDER=openai        → ChatOpenAI + OpenAIEmbeddings + FAISS
 AI_PROVIDER=azure_openai  → AzureChatOpenAI + AzureOpenAIEmbeddings + Azure AI Search
 
-Default          : AI_PROVIDER=openai
+Default          : AI_PROVIDER=azure_openai
 LLM (openai)     : ChatOpenAI(model="gpt-4o")
 Embeddings (openai): OpenAIEmbeddings(model="text-embedding-ada-002") + FAISS
 LLM (azure)      : AzureChatOpenAI(azure_deployment=...)
@@ -102,6 +105,18 @@ Embeddings (azure): AzureOpenAIEmbeddings(azure_deployment=...) + Azure AI Searc
 Rule             : All provider imports are LAZY (inside if/elif blocks)
                    Only the active provider's package is imported at runtime
                    A single AI_PROVIDER flag switches LLM + embeddings + vector store together
+```
+
+---
+
+## Document Metadata Store (DynamoDB — replaces SQLite)
+```
+Storage          : AWS DynamoDB (table: hm-documents, region: ap-south-1)
+Partition key    : id (String, UUID)
+Config fields    : dynamo_table, dynamo_region (in Settings)
+IAM role         : apprunner-hm-instance-role (DynamoDB full access)
+Persistence      : Survives App Runner redeployments (unlike SQLite)
+Dev testing      : moto library mocks DynamoDB in unit tests
 ```
 
 ---
@@ -176,7 +191,12 @@ and accessible to any authenticated user (used by sidebar for dynamic questions)
 │   │       ├── chat_router.py
 │   │       └── documents_router.py
 │   ├── tests/
-│   │   └── test_agent_logic.py  (43 unit tests)
+│   │   ├── __init__.py
+│   │   ├── test_agent_logic.py       (43 tests — agent retry, RBAC, chat endpoint)
+│   │   ├── test_config.py            (4 tests — Settings defaults, Azure fields)
+│   │   ├── test_azure_integration.py (7 tests — Azure LLM, embeddings, search, ingest)
+│   │   ├── test_document_store.py    (15 tests — DynamoDB CRUD via moto)
+│   │   └── test_provider_switching.py(14 tests — AI_PROVIDER flag, FAISS vs Azure)
 │   ├── data/                    (empty dir, .gitkeep)
 │   ├── vector_store/            (empty dir, .gitkeep)
 │   ├── requirements.txt

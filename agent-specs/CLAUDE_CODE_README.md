@@ -7,8 +7,9 @@
 
 An internal AI knowledge assistant for Happiest Minds Technologies.
 Full stack: FastAPI + LangChain ReAct + FAISS/Azure AI Search + React 18.
+Document metadata: DynamoDB (replaces SQLite documents.db).
 Happiest Minds brand: Green #3AB54A, Teal #009797, Inter + Montserrat fonts.
-Deployed on AWS App Runner.
+Deployed on AWS App Runner with IAM role apprunner-hm-instance-role.
 
 ---
 
@@ -20,7 +21,7 @@ Deployed on AWS App Runner.
 ## Folder Structure
 ```
 /Users/soumya.shrivastava/AgenticallyBuiltChatBot/
-├── agent-specs/          ← all spec files live here (read-only, do not modify)
+├── agent-specs/          ← all spec files live here
 │   ├── CLAUDE_CODE_README.md
 │   ├── 00_DECISIONS.md
 │   ├── 01_PROJECT_OVERVIEW.md
@@ -34,8 +35,11 @@ Deployed on AWS App Runner.
 │   ├── 09_DOCKER.md
 │   └── 10_AWS_DEPLOY.md
 ├── backend/              ← created by spec 03
+│   └── tests/            ← 83 tests across 5 files (see docs/TEST_RECORD.md)
 ├── frontend/             ← created by spec 08
-└── docker/               ← created by spec 09
+├── docker/               ← created by spec 09
+└── docs/
+    └── TEST_RECORD.md    ← full test inventory and pass/fail record
 ```
 
 ---

@@ -85,6 +85,7 @@ This is the product. Everything else supports this moment.
 | Conversation memory | Last 10 turns |
 | Agent max iterations | max(5, 7) with force stop + retry (3 attempts) + vector store fallback |
 | Vector store | FAISS (AI_PROVIDER=openai) or Azure AI Search (AI_PROVIDER=azure_openai) |
+| Document metadata | DynamoDB (table: hm-documents, persists across App Runner redeployments) |
 
 ---
 

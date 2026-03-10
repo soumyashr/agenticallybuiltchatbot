@@ -40,10 +40,17 @@ AZURE_OPENAI_EMBEDDING_DEPLOYMENT=
 AZURE_SEARCH_ENDPOINT=  ← required if AI_PROVIDER=azure_openai
 AZURE_SEARCH_ADMIN_KEY=
 AZURE_SEARCH_INDEX=
+DYNAMO_TABLE=hm-documents
+DYNAMO_REGION=ap-south-1
 JWT_SECRET=<production-secret>
 DATA_DIR=data
 VECTOR_STORE_DIR=vector_store
 ```
+
+### IAM Role
+The App Runner service uses instance role `apprunner-hm-instance-role` with
+`AmazonDynamoDBFullAccess` policy attached. This allows the backend to
+read/write the `hm-documents` DynamoDB table without explicit AWS credentials.
 
 ### Frontend Build Arg
 The frontend Docker build must pass the backend URL as a build arg:
@@ -56,10 +63,10 @@ export const API_BASE = import.meta.env.VITE_API_URL || '';
 ```
 
 ### Stateless Container Limitation
-App Runner containers are stateless. Documents uploaded via the admin panel
-(stored in `data/` and `vector_store/` directories) are lost on redeployment.
-To persist documents across deploys, use an external storage solution
-(e.g. EFS, S3 + re-ingest on startup, or a persistent EC2 deployment).
+App Runner containers are stateless. PDF files uploaded to `data/` are lost
+on redeployment. However, document metadata now persists in DynamoDB
+(table: hm-documents) and survives redeployments. The vector store
+(Azure AI Search) is also cloud-hosted and persistent.
 
 CORS in `main.py` includes the App Runner URL:
 ```python
