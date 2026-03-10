@@ -178,6 +178,36 @@ All tests use `moto` to mock DynamoDB. No real AWS calls.
 
 ---
 
+## Deployment Prerequisites
+
+The App Runner IAM role (`apprunner-hm-instance-role`) has `dynamodb:DescribeTable`,
+`dynamodb:PutItem`, `dynamodb:GetItem`, `dynamodb:Scan`, and `dynamodb:UpdateItem`
+permissions but does **NOT** have `dynamodb:CreateTable`. Tables must be created
+manually before the first deployment.
+
+Create both tables via AWS CLI:
+```bash
+aws dynamodb create-table \
+  --table-name hm-feedback \
+  --attribute-definitions AttributeName=id,AttributeType=S \
+  --key-schema AttributeName=id,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region ap-south-1
+
+aws dynamodb create-table \
+  --table-name hm-escalations \
+  --attribute-definitions AttributeName=id,AttributeType=S \
+  --key-schema AttributeName=id,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region ap-south-1
+```
+
+**Incident note (2026-03-10):** App Runner rolled back twice because these tables
+did not exist and `init_feedback_table()` / `init_escalation_table()` crashed on
+startup. Tables were created manually via AWS CLI before redeploying successfully.
+
+---
+
 ## Dependencies
 
 - `httpx>=0.27.0` — Async HTTP client used by `_notify_slack()` for Slack webhook POST requests
