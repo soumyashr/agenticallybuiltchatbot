@@ -46,6 +46,7 @@ azure-search-documents>=11.4.0
 azure-identity>=1.15.0
 boto3>=1.34.0
 moto[dynamodb]>=5.0.0
+httpx>=0.27.0
 ```
 
 Then run:

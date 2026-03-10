@@ -9,8 +9,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 105 |
-| Pass | 105 |
+| Total tests | 106 |
+| Pass | 106 |
 | Fail | 0 |
 | Test files | 7 |
 | Python | 3.11.9 |
@@ -20,8 +20,8 @@ Both provider configurations tested:
 
 | Provider | Tests | Passed | Failed |
 |----------|-------|--------|--------|
-| AI_PROVIDER=openai | 105 | 105 | 0 |
-| AI_PROVIDER=azure_openai | 105 | 105 | 0 |
+| AI_PROVIDER=openai | 106 | 106 | 0 |
+| AI_PROVIDER=azure_openai | 106 | 106 | 0 |
 
 ---
 
@@ -117,7 +117,7 @@ Uses `moto` library to mock AWS DynamoDB.
 
 AI_PROVIDER coverage: provider-independent (DynamoDB works regardless of AI_PROVIDER).
 
-### 7. test_escalation.py (10 tests)
+### 7. test_escalation.py (11 tests)
 
 Covers: UC-10 escalation — DynamoDB store, agent escalation logic, Slack webhook, admin endpoint.
 Uses `moto` library to mock AWS DynamoDB, extensive mocking of agent internals.
@@ -125,7 +125,7 @@ Uses `moto` library to mock AWS DynamoDB, extensive mocking of agent internals.
 | Class | Tests | Coverage |
 |-------|-------|----------|
 | TestEscalationStore | 3 | save_uuid, correct_fields, mark_notified |
-| TestEscalationLogic | 5 | saved_on_no_answer, saved_on_parse_failure, slack_sent_when_configured, slack_failure_no_break, no_slack_when_no_webhook |
+| TestEscalationLogic | 6 | saved_on_no_answer, saved_on_parse_failure, slack_sent_when_configured, slack_failure_no_break, httpx_importable, no_slack_when_no_webhook |
 | TestEscalationEndpoint | 2 | admin_view, student_403 |
 
 AI_PROVIDER coverage: provider-agnostic (mocks LLM/tools at function level).
@@ -224,4 +224,4 @@ cd backend && python3 -m pytest tests/test_document_store.py -v
 
 ## Known Issues
 
-None. All 105 tests pass for both AI_PROVIDER values.
+None. All 106 tests pass for both AI_PROVIDER values.

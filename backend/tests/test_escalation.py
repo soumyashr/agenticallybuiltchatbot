@@ -251,6 +251,11 @@ class TestEscalationLogic:
 
         assert "answer" in result  # Chat still returned a valid result
 
+    def test_httpx_importable(self):
+        """Regression test — ensures httpx is available (caused deploy rollback)."""
+        import httpx
+        assert httpx.__version__ is not None
+
     @patch("app.agent._build_llm")
     @patch("app.agent.make_search_tools")
     @patch("app.agent.save_escalation")

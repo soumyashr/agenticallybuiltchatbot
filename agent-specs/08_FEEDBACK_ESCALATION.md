@@ -178,6 +178,12 @@ All tests use `moto` to mock DynamoDB. No real AWS calls.
 
 ---
 
+## Dependencies
+
+- `httpx>=0.27.0` — Async HTTP client used by `_notify_slack()` for Slack webhook POST requests
+
+---
+
 ## VERIFICATION CHECKLIST
 
 - [ ] `POST /feedback` with valid token and `rating: "positive"` returns 200
