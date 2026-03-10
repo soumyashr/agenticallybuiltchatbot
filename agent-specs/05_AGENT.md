@@ -6,6 +6,13 @@
 
 ---
 
+## Note — UC-14 Guardrail Protection
+
+All user messages pass through a two-layer guardrail system (`app/guardrails.py`)
+**before** reaching the agent. See `09_GUARDRAILS.md` for details.
+
+---
+
 ## STEP 1 — agent.py
 
 Write to `backend/app/agent.py`:

@@ -9,10 +9,10 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 106 |
-| Pass | 106 |
+| Total tests | 127 |
+| Pass | 127 |
 | Fail | 0 |
-| Test files | 7 |
+| Test files | 8 |
 | Python | 3.11.9 |
 | Runner | pytest 9.0.2 |
 
@@ -20,8 +20,8 @@ Both provider configurations tested:
 
 | Provider | Tests | Passed | Failed |
 |----------|-------|--------|--------|
-| AI_PROVIDER=openai | 106 | 106 | 0 |
-| AI_PROVIDER=azure_openai | 106 | 106 | 0 |
+| AI_PROVIDER=openai | 127 | 127 | 0 |
+| AI_PROVIDER=azure_openai | 127 | 127 | 0 |
 
 ---
 
@@ -130,6 +130,20 @@ Uses `moto` library to mock AWS DynamoDB, extensive mocking of agent internals.
 
 AI_PROVIDER coverage: provider-agnostic (mocks LLM/tools at function level).
 
+### 8. test_guardrails.py (21 tests)
+
+Covers: UC-14 two-layer abuse & security guardrails — sync pattern checks,
+LLM classification (mocked), integration, config defaults.
+
+| Class | Tests | Coverage |
+|-------|-------|----------|
+| TestLayer1PatternChecks | 12 | Length limit, injection patterns (4 variants + case-insensitive), repeated chars, script injection (2 variants), clean message, off-topic passes |
+| TestLayer2LLMCheck | 5 | UNSAFE blocks, SAFE passes, LLM error fail-open, unexpected response passes, layer2 disabled skips |
+| TestGuardrailIntegration | 2 | Layer 1 blocks before Layer 2, both layers pass |
+| TestGuardrailConfig | 2 | guardrail_max_length default, guardrail_layer2_enabled default |
+
+AI_PROVIDER coverage: provider-agnostic (mocks LLM at function level).
+
 ---
 
 ## Key Tests for AI_PROVIDER Switching
@@ -224,4 +238,4 @@ cd backend && python3 -m pytest tests/test_document_store.py -v
 
 ## Known Issues
 
-None. All 106 tests pass for both AI_PROVIDER values.
+None. All 127 tests pass for both AI_PROVIDER values.

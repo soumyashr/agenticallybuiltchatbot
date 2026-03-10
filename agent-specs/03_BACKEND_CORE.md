@@ -462,6 +462,13 @@ router = APIRouter()
 
 ---
 
+## STEP 9B — guardrails.py
+
+See `09_GUARDRAILS.md` for the full UC-14 guardrail module (`backend/app/guardrails.py`).
+This module is called by `chat_router.py` before the agent processes any message.
+
+---
+
 ## STEP 10 — main.py
 
 Write to `backend/app/main.py`:

@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     slack_webhook_url: str = ""
     escalation_enabled: bool = True
 
+    # UC-14 Guardrails
+    guardrail_max_length: int = 2000
+    guardrail_layer2_enabled: bool = True
+
     # Data
     data_dir: str = "data"
     vector_store_dir: str = "vector_store"
