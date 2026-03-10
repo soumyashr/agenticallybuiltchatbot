@@ -53,9 +53,33 @@ VECTOR_STORE_DIR=vector_store
 
 ### IAM Role
 The App Runner service uses instance role `apprunner-hm-instance-role` with
-`AmazonDynamoDBFullAccess` policy attached. This allows the backend to
-read/write the DynamoDB tables (`hm-documents`, `hm-feedback`, `hm-escalations`)
-without explicit AWS credentials.
+an inline policy called `DynamoDBAccess`. This grants read/write access to
+specific DynamoDB tables without explicit AWS credentials.
+
+**Important:** The role does NOT have `dynamodb:CreateTable`. When introducing
+a new DynamoDB table you must:
+1. Create the table manually via AWS CLI before deploying
+2. Add the table ARN to the `DynamoDBAccess` inline policy on `apprunner-hm-instance-role`
+
+Current `DynamoDBAccess` inline policy:
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "dynamodb:DescribeTable",
+    "dynamodb:PutItem",
+    "dynamodb:GetItem",
+    "dynamodb:Scan",
+    "dynamodb:UpdateItem",
+    "dynamodb:DeleteItem"
+  ],
+  "Resource": [
+    "arn:aws:dynamodb:ap-south-1:*:table/hm-documents",
+    "arn:aws:dynamodb:ap-south-1:*:table/hm-feedback",
+    "arn:aws:dynamodb:ap-south-1:*:table/hm-escalations"
+  ]
+}
+```
 
 ### Frontend Build Arg
 The frontend Docker build must pass the backend URL as a build arg:

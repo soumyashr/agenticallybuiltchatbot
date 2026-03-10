@@ -180,12 +180,11 @@ All tests use `moto` to mock DynamoDB. No real AWS calls.
 
 ## Deployment Prerequisites
 
-The App Runner IAM role (`apprunner-hm-instance-role`) has `dynamodb:DescribeTable`,
-`dynamodb:PutItem`, `dynamodb:GetItem`, `dynamodb:Scan`, and `dynamodb:UpdateItem`
-permissions but does **NOT** have `dynamodb:CreateTable`. Tables must be created
-manually before the first deployment.
+The App Runner IAM role (`apprunner-hm-instance-role`) does **NOT** have
+`dynamodb:CreateTable`. Two manual steps are required before deploying:
 
-Create both tables via AWS CLI:
+### 1. Create the tables manually via AWS CLI
+
 ```bash
 aws dynamodb create-table \
   --table-name hm-feedback \
@@ -200,6 +199,30 @@ aws dynamodb create-table \
   --key-schema AttributeName=id,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
   --region ap-south-1
+```
+
+### 2. Add the table ARNs to the IAM inline policy
+
+Add both table ARNs to the `DynamoDBAccess` inline policy on
+`apprunner-hm-instance-role`:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "dynamodb:DescribeTable",
+    "dynamodb:PutItem",
+    "dynamodb:GetItem",
+    "dynamodb:Scan",
+    "dynamodb:UpdateItem",
+    "dynamodb:DeleteItem"
+  ],
+  "Resource": [
+    "arn:aws:dynamodb:ap-south-1:*:table/hm-documents",
+    "arn:aws:dynamodb:ap-south-1:*:table/hm-feedback",
+    "arn:aws:dynamodb:ap-south-1:*:table/hm-escalations"
+  ]
+}
 ```
 
 **Incident note (2026-03-10):** App Runner rolled back twice because these tables
