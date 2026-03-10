@@ -9,8 +9,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 138 |
-| Pass | 138 |
+| Total tests | 150 |
+| Pass | 150 |
 | Fail | 0 |
 | Test files | 9 |
 | Python | 3.11.9 |
@@ -20,14 +20,14 @@ Both provider configurations tested:
 
 | Provider | Tests | Passed | Failed |
 |----------|-------|--------|--------|
-| AI_PROVIDER=openai | 138 | 138 | 0 |
-| AI_PROVIDER=azure_openai | 138 | 138 | 0 |
+| AI_PROVIDER=openai | 150 | 150 | 0 |
+| AI_PROVIDER=azure_openai | 150 | 150 | 0 |
 
 ---
 
 ## Test Files
 
-### 1. test_agent_logic.py (43 tests)
+### 1. test_agent_logic.py (55 tests)
 
 Covers: agent retry logic, RBAC filtering, document ingest, chat endpoint,
 GET /documents/my sidebar endpoint.
@@ -45,6 +45,11 @@ GET /documents/my sidebar endpoint.
 | TestDocumentIngest | 3 | `_filter_by_role`, JSON string roles, no-index search |
 | TestChatEndpoint | 4 | POST /chat: 401, 200, 500 paths |
 | TestDocumentsMyEndpoint | 5 | GET /documents/my: auth, filtering, no field leaks |
+| TestFormGuidanceUC11 | 12 | UC-11 form guidance: UIB-140 (6 tests, AC1-AC6), UIB-143 (5 tests, AC1,2,3,5,6), + 1 prompt verification |
+
+AC tags used: `# AC: UIB-140-AC1` through `# AC: UIB-140-AC6`,
+`# AC: UIB-143-AC1`, `# AC: UIB-143-AC2`, `# AC: UIB-143-AC3`,
+`# AC: UIB-143-AC5`, `# AC: UIB-143-AC6`.
 
 AI_PROVIDER coverage: provider-agnostic (mocks LLM/tools at function level).
 
@@ -264,4 +269,4 @@ cd backend && python3 -m pytest tests/test_document_store.py -v
 
 ## Known Issues
 
-None. All 138 tests pass for both AI_PROVIDER values.
+None. All 150 tests pass for both AI_PROVIDER values.

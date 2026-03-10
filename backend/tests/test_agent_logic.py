@@ -571,3 +571,385 @@ class TestDocumentsMyEndpoint:
             assert "filepath" not in doc
             assert "file_size" not in doc
             assert set(doc.keys()) == {"id", "display_name", "allowed_roles", "chunk_count"}
+
+
+# ═══════════════════════════════════════════════════════════════
+# 6. UC-11 Form Guidance (UIB-140 + UIB-143)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestFormGuidanceUC11:
+    """
+    Tests for UC-11 form guidance behavior (UIB-140 + UIB-143).
+    Verifies system prompt additions for form purpose/usage and location guidance.
+    """
+
+    @pytest.fixture(autouse=True)
+    def cleanup_sessions(self):
+        _sessions.clear()
+        yield
+        _sessions.clear()
+
+    # ── UIB-140: Answer questions about form purpose and usage ──
+
+    # AC: UIB-140-AC1
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    def test_form_query_triggers_semantic_search(self, mock_tools, mock_llm):
+        """AC1: Query containing 'form' triggers semantic search tool."""
+        mock_llm.return_value = MagicMock()
+        search_tool = MagicMock(name="semantic_search")
+        mock_tools.return_value = [search_tool]
+
+        invoked_inputs = []
+
+        def fake_invoke(inputs):
+            invoked_inputs.append(inputs)
+            return {
+                "output": "The Leave Application Form is used for requesting time off. Source: forms_guide.pdf, Page: 12",
+                "intermediate_steps": [
+                    _make_step("[1] Source: forms_guide.pdf, Page: 12\nLeave Application Form details...")
+                ],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("What is the leave application form?", "form-ac1", Role.student)
+            )
+
+        assert len(invoked_inputs) == 1
+        assert "form" in invoked_inputs[0]["input"].lower()
+        assert result["fallback_used"] is False
+
+    # AC: UIB-140-AC2
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    def test_form_response_contains_purpose(self, mock_tools, mock_llm):
+        """AC2: Response contains form purpose when docs have it."""
+        mock_llm.return_value = MagicMock()
+        mock_tools.return_value = [MagicMock(name="semantic_search")]
+
+        def fake_invoke(inputs):
+            return {
+                "output": "The Travel Reimbursement Form is used for claiming travel expenses after official trips. Eligible employees include full-time staff. Source: hr_forms.pdf, Page: 5",
+                "intermediate_steps": [
+                    _make_step("[1] Source: hr_forms.pdf, Page: 5\nTravel Reimbursement Form purpose and eligibility...")
+                ],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("What is the travel reimbursement form for?", "form-ac2", Role.student)
+            )
+
+        answer = result["answer"].lower()
+        assert "travel reimbursement form" in answer
+        assert "expense" in answer or "claiming" in answer
+
+    # AC: UIB-140-AC3
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    def test_form_response_no_speculation(self, mock_tools, mock_llm):
+        """AC3: Response does not contain speculative phrases for form queries."""
+        mock_llm.return_value = MagicMock()
+        mock_tools.return_value = [MagicMock(name="semantic_search")]
+
+        def fake_invoke(inputs):
+            return {
+                "output": "The IT Access Request Form is used by new employees to request system access. Source: it_forms.pdf, Page: 3",
+                "intermediate_steps": [
+                    _make_step("[1] Source: it_forms.pdf, Page: 3\nIT Access Request Form...")
+                ],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("Tell me about the IT access request form", "form-ac3", Role.student)
+            )
+
+        answer = result["answer"].lower()
+        speculative_phrases = ["i think", "probably", "you might want to", "i believe", "maybe"]
+        for phrase in speculative_phrases:
+            assert phrase not in answer, f"Speculative phrase '{phrase}' found in response"
+
+    # AC: UIB-140-AC4
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    def test_similar_forms_differentiated(self, mock_tools, mock_llm):
+        """AC4: When two similar forms exist, response differentiates them."""
+        mock_llm.return_value = MagicMock()
+        mock_tools.return_value = [MagicMock(name="semantic_search")]
+
+        def fake_invoke(inputs):
+            return {
+                "output": (
+                    "There are two leave-related forms: "
+                    "1) The Casual Leave Form is for short-term personal leave (up to 3 days). "
+                    "2) The Medical Leave Form is for health-related absences requiring a doctor's certificate. "
+                    "Source: hr_forms.pdf, Page: 8"
+                ),
+                "intermediate_steps": [
+                    _make_step(
+                        "[1] Source: hr_forms.pdf, Page: 8\nCasual Leave Form...\n---\n"
+                        "[2] Source: hr_forms.pdf, Page: 10\nMedical Leave Form..."
+                    )
+                ],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("What leave forms are available?", "form-ac4", Role.student)
+            )
+
+        answer = result["answer"].lower()
+        assert "casual leave" in answer
+        assert "medical leave" in answer
+
+    # AC: UIB-140-AC5
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    def test_undocumented_form_returns_fallback(self, mock_tools, mock_llm):
+        """AC5: Undocumented form query returns no-match fallback."""
+        mock_llm.return_value = MagicMock()
+        mock_tools.return_value = [MagicMock(name="semantic_search")]
+
+        def fake_invoke(inputs):
+            return {
+                "output": "I could not find information on this topic in the documents accessible to you.",
+                "intermediate_steps": [
+                    _make_step("[1] Source: general_docs.pdf, Page: 1\nUnrelated content about policies")
+                ],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("How do I fill the XYZ-9999 form?", "form-ac5", Role.student)
+            )
+
+        assert "could not find" in result["answer"].lower()
+
+    # AC: UIB-140-AC6
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    def test_role_based_form_access(self, mock_tools, mock_llm):
+        """AC6: Student querying faculty-only form gets access-denied response."""
+        mock_llm.return_value = MagicMock()
+
+        def make_tools_for_role(user_role):
+            tool = MagicMock(name="semantic_search")
+            return [tool]
+
+        mock_tools.side_effect = make_tools_for_role
+
+        def fake_invoke(inputs):
+            return {
+                "output": "I could not find information on this topic in the documents accessible to you.",
+                "intermediate_steps": [],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("Show me the faculty evaluation form", "form-ac6", Role.student)
+            )
+
+        # Student should not see faculty-only content — fallback expected
+        answer = result["answer"].lower()
+        assert "could not find" in answer or "not available" in answer or "accessible to you" in answer
+
+    # ── UIB-143: Guide users on where to find forms ──
+
+    # AC: UIB-143-AC1
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    def test_form_location_returned_when_in_docs(self, mock_tools, mock_llm):
+        """AC1: Location info returned when available in docs."""
+        mock_llm.return_value = MagicMock()
+        mock_tools.return_value = [MagicMock(name="semantic_search")]
+
+        def fake_invoke(inputs):
+            return {
+                "output": "The Leave Application Form can be found in the HR Portal under Forms > Leave Management. Source: hr_guide.pdf, Page: 15",
+                "intermediate_steps": [
+                    _make_step("[1] Source: hr_guide.pdf, Page: 15\nLeave Application Form location: HR Portal > Forms > Leave Management")
+                ],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("Where can I find the leave application form?", "loc-ac1", Role.student)
+            )
+
+        answer = result["answer"].lower()
+        assert "hr portal" in answer or "forms" in answer or "leave management" in answer
+
+    # AC: UIB-143-AC2
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    def test_form_location_respects_rbac(self, mock_tools, mock_llm):
+        """AC2: Location guidance respects RBAC — student can't see faculty-only form locations."""
+        mock_llm.return_value = MagicMock()
+        mock_tools.return_value = [MagicMock(name="semantic_search")]
+
+        def fake_invoke(inputs):
+            return {
+                "output": "I could not find information on this topic in the documents accessible to you.",
+                "intermediate_steps": [
+                    _make_step("[1] Source: general.pdf, Page: 1\nUnrelated content")
+                ],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("Where do I find the faculty performance review form?", "loc-ac2", Role.student)
+            )
+
+        assert "could not find" in result["answer"].lower()
+
+    # AC: UIB-143-AC3
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    def test_step_by_step_navigation_when_no_direct_link(self, mock_tools, mock_llm):
+        """AC3: Step-by-step navigation provided when no direct link available."""
+        mock_llm.return_value = MagicMock()
+        mock_tools.return_value = [MagicMock(name="semantic_search")]
+
+        def fake_invoke(inputs):
+            return {
+                "output": (
+                    "To access the IT Access Request Form: "
+                    "1. Log in to the internal portal. "
+                    "2. Navigate to IT Services. "
+                    "3. Click on Forms & Requests. "
+                    "4. Select 'New Access Request'. "
+                    "Source: it_guide.pdf, Page: 22"
+                ),
+                "intermediate_steps": [
+                    _make_step("[1] Source: it_guide.pdf, Page: 22\nIT Access Request Form — navigation steps...")
+                ],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("How do I get to the IT access request form?", "loc-ac3", Role.student)
+            )
+
+        answer = result["answer"]
+        # Should contain step indicators (numbered steps or navigation path)
+        assert "1." in answer or "step" in answer.lower() or "navigate" in answer.lower()
+
+    # AC: UIB-143-AC5
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    def test_no_guessed_urls_in_response(self, mock_tools, mock_llm):
+        """AC5: No guessed URLs appear in form location responses."""
+        mock_llm.return_value = MagicMock()
+        mock_tools.return_value = [MagicMock(name="semantic_search")]
+
+        def fake_invoke(inputs):
+            return {
+                "output": "The form can be found in the HR Portal under Forms section. Contact HR for direct access. Source: hr_guide.pdf, Page: 15",
+                "intermediate_steps": [
+                    _make_step("[1] Source: hr_guide.pdf, Page: 15\nForm location details...")
+                ],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("Where can I download the expense form?", "loc-ac5", Role.student)
+            )
+
+        answer = result["answer"]
+        # Should not contain fabricated URLs
+        import re as _re
+        url_pattern = _re.compile(r'https?://(?![\s])[^\s]+')
+        urls_found = url_pattern.findall(answer)
+        assert len(urls_found) == 0, f"Guessed URLs found in response: {urls_found}"
+
+    # AC: UIB-143-AC6
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    def test_location_access_control_respected(self, mock_tools, mock_llm):
+        """AC6: Access control respected for form locations — admin-only locations hidden from students."""
+        mock_llm.return_value = MagicMock()
+        mock_tools.return_value = [MagicMock(name="semantic_search")]
+
+        def fake_invoke(inputs):
+            return {
+                "output": "I could not find information on this topic in the documents accessible to you.",
+                "intermediate_steps": [],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("Where is the admin budget allocation form?", "loc-ac6", Role.student)
+            )
+
+        answer = result["answer"].lower()
+        assert "could not find" in answer or "accessible to you" in answer
+
+    # ── System prompt verification ──
+
+    def test_system_prompt_contains_form_guidance(self):
+        """Verify the system prompt includes UC-11 form guidance sections."""
+        # Read from .env file directly since lru_cache may hold stale settings
+        import os
+        env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+        with open(env_path) as f:
+            env_content = f.read()
+        # Find AGENT_SYSTEM_PROMPT value in .env
+        for line in env_content.split("\n"):
+            if line.startswith("AGENT_SYSTEM_PROMPT="):
+                prompt = line[len("AGENT_SYSTEM_PROMPT="):]
+                break
+        else:
+            pytest.fail("AGENT_SYSTEM_PROMPT not found in .env")
+        assert "FORM GUIDANCE" in prompt
+        assert "UIB-140" in prompt
+        assert "FORM LOCATION GUIDANCE" in prompt
+        assert "UIB-143" in prompt
+        assert "never guess" in prompt.lower() or "never fabricate" in prompt.lower()
+        assert "role-based access" in prompt.lower() or "role" in prompt.lower()

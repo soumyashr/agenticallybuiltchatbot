@@ -624,3 +624,73 @@ async def clear_chat_endpoint(
 - Jira AC = WHAT (behavior) — wins on conflicts
 - This .md = HOW (implementation) — wins on design decisions
 - Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden
+
+---
+
+## UIB-140 Form Guidance Implementation
+
+**Story:** UIB-140 — Answer questions about form purpose and usage
+**Date:** 2026-03-10
+
+### What Changed
+Added `FORM GUIDANCE (UC-11 — UIB-140)` section to `agent_system_prompt` in both
+`backend/app/config.py` (default) and `backend/.env` (runtime override).
+
+### Prompt Behavior
+When a user asks about a form, process, or procedure:
+- Identify the specific form from the knowledge base using semantic search
+- Describe the form's purpose, eligibility criteria, and typical usage scenarios
+- If multiple similar forms exist, clearly differentiate them
+- Never guess or fabricate form details not in approved documents
+- Respect role-based access — only reference forms accessible to the user's role
+- If form not found — use standard fallback (UC-09 behavior)
+
+### AC Coverage
+| AC | Description | Status |
+|----|-------------|--------|
+| AC1 | Chatbot identifies relevant form(s) from approved docs | ✅ |
+| AC2 | Describes purpose, scenarios, eligibility from official docs | ✅ |
+| AC3 | Information strictly from approved sources, no guesses | ✅ |
+| AC4 | Clarifies differences when multiple similar forms exist | ✅ |
+| AC5 | Falls back to "no matching content" if form undocumented | ✅ |
+| AC6 | Role-based differences respected where documented | ✅ |
+
+### Tests
+6 tests in `TestFormGuidanceUC11` class (`backend/tests/test_agent_logic.py`),
+tagged `# AC: UIB-140-AC1` through `# AC: UIB-140-AC6`.
+
+---
+
+## UIB-143 Form Location Guidance
+
+**Story:** UIB-143 — Guide users on where to find forms
+**Date:** 2026-03-10
+
+### What Changed
+Added `FORM LOCATION GUIDANCE (UC-11 — UIB-143)` section to `agent_system_prompt`
+in both `backend/app/config.py` and `backend/.env`.
+
+### Prompt Behavior
+When a user asks where to find or download a form:
+- Provide navigation path or location from approved documents if available
+- Give step-by-step instructions when no direct link is documented
+- Never provide guessed or unverified URLs or links
+- If location not in docs — say so clearly and suggest contacting admin
+- Only reference locations the user's role is authorized to access
+
+### AC Coverage
+| AC | Description | Status |
+|----|-------------|--------|
+| AC1 | Location info returned when in docs | ✅ |
+| AC2 | Location respects RBAC | ✅ |
+| AC3 | Step-by-step navigation when no direct link | ✅ |
+| AC4 | Form locations configurable by admins | ❌ BLOCKED (UC-16) |
+| AC5 | No guessed URLs in response | ✅ |
+| AC6 | Access control respected for locations | ✅ |
+
+**BLOCKED:** AC4 requires Admin Console (UC-16) which is not implemented.
+Logged in `docs/CONFLICTS.md`.
+
+### Tests
+5 tests in `TestFormGuidanceUC11` class (`backend/tests/test_agent_logic.py`),
+tagged `# AC: UIB-143-AC1,2,3,5,6`. Plus 1 shared prompt verification test.

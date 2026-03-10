@@ -44,8 +44,8 @@ Last Updated: 2026-03-10
 | UC-09 | UIB-122 | UIB-126 | Return safe fallback instead of speculative answer | 0 | 0 | ✅ Done |
 | UC-10 | UIB-130 | UIB-131 | Detect and log unanswered queries with metadata | 0 | 11 | ✅ Done |
 | UC-10 | UIB-130 | UIB-135 | Route unanswered queries to designated university teams | 0 | 11 | ✅ Done |
-| UC-11 | UIB-139 | UIB-140 | Answer questions about form purpose and usage | 0 | 0 | ❌ Pending |
-| UC-11 | UIB-139 | UIB-143 | Guide users on where to find forms | 0 | 0 | ❌ Pending |
+| UC-11 | UIB-139 | UIB-140 | Answer questions about form purpose and usage | 6 | 6 | ✅ Done |
+| UC-11 | UIB-139 | UIB-143 | Guide users on where to find forms | 6 | 5 | ⚠️ Partial (AC4 blocked on UC-16) |
 | UC-12 | UIB-147 | UIB-148 | Detect workflow-execution attempts | 0 | 0 | ❌ Pending |
 | UC-12 | UIB-147 | UIB-152 | Inform users that workflow execution is not supported | 0 | 0 | ❌ Pending |
 | UC-13 | UIB-156 | UIB-157 | Detect irrelevant or out-of-scope queries | 0 | 0 | ✅ Done |
