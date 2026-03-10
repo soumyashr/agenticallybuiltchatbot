@@ -154,7 +154,7 @@ def ingest_documents(admin: dict = Depends(require_admin)):
 # ── 4. Delete ─────────────────────────────────────────────────
 
 @router.delete("/documents/{doc_id}")
-def delete_doc(doc_id: int, admin: dict = Depends(require_admin)):
+def delete_doc(doc_id: str, admin: dict = Depends(require_admin)):
     """
     Delete a document record from DB + its PDF file from disk.
     If the document was INGESTED, rebuilds FAISS index without it.
@@ -207,7 +207,7 @@ def my_documents(user: dict = Depends(get_current_user)):
 # ── 6. Status poll ────────────────────────────────────────────
 
 @router.get("/documents/{doc_id}/status")
-def get_document_status(doc_id: int, admin: dict = Depends(require_admin)):
+def get_document_status(doc_id: str, admin: dict = Depends(require_admin)):
     """Poll a single document's ingest status. Used by frontend during ingest."""
     docs = get_all_documents()
     doc  = next((d for d in docs if d["id"] == doc_id), None)

@@ -40,6 +40,7 @@ async def startup() -> None:
     init_users_db()
     from app.document_store import init_db
     init_db()
+    log.info("DocumentStore: DynamoDB table '%s' in %s", settings.dynamo_table, settings.dynamo_region)
     log.info("Startup complete.")
 
 

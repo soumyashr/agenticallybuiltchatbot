@@ -1,42 +1,69 @@
-import sqlite3
 import json
+import uuid
 import logging
 from datetime import datetime
 
+import boto3
+from botocore.exceptions import ClientError
+
+from app.config import settings
+
 log = logging.getLogger(__name__)
-DB_PATH = "documents.db"
+
+_table = None
+
+
+def _get_table():
+    """Return the cached DynamoDB Table resource."""
+    global _table
+    if _table is None:
+        dynamodb = boto3.resource("dynamodb", region_name=settings.dynamo_region)
+        _table = dynamodb.Table(settings.dynamo_table)
+    return _table
 
 
 def init_db() -> None:
-    """Create documents table if it does not exist."""
-    con = sqlite3.connect(DB_PATH)
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS documents (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename      TEXT NOT NULL,
-            display_name  TEXT NOT NULL,
-            allowed_roles TEXT NOT NULL,
-            status        TEXT NOT NULL DEFAULT 'UPLOADED',
-            chunk_count   INTEGER NOT NULL DEFAULT 0,
-            file_size     INTEGER NOT NULL DEFAULT 0,
-            uploaded_at   TEXT NOT NULL DEFAULT (datetime('now')),
-            ingested_at   TEXT,
-            error_msg     TEXT
-        )
-    """)
-    con.commit()
-    con.close()
-    log.info("Documents DB initialised.")
+    """Create the DynamoDB table if it does not already exist."""
+    global _table
+    dynamodb = boto3.resource("dynamodb", region_name=settings.dynamo_region)
+
+    try:
+        dynamodb.meta.client.describe_table(TableName=settings.dynamo_table)
+        log.info("DynamoDB table '%s' already exists.", settings.dynamo_table)
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "ResourceNotFoundException":
+            table = dynamodb.create_table(
+                TableName=settings.dynamo_table,
+                KeySchema=[{"AttributeName": "id", "KeyType": "HASH"}],
+                AttributeDefinitions=[{"AttributeName": "id", "AttributeType": "S"}],
+                BillingMode="PAY_PER_REQUEST",
+            )
+            table.wait_until_exists()
+            log.info("Created DynamoDB table '%s'.", settings.dynamo_table)
+        else:
+            raise
+
+    _table = dynamodb.Table(settings.dynamo_table)
+    log.info("Documents DB initialised (DynamoDB).")
 
 
-def _row_to_dict(row: tuple) -> dict:
-    cols = [
-        "id", "filename", "display_name", "allowed_roles",
-        "status", "chunk_count", "file_size",
-        "uploaded_at", "ingested_at", "error_msg",
-    ]
-    d = dict(zip(cols, row))
-    d["allowed_roles"] = json.loads(d["allowed_roles"])
+def _item_to_dict(item: dict) -> dict:
+    """Convert a DynamoDB item to a plain dict with correct types."""
+    d = {
+        "id": item["id"],
+        "filename": item.get("filename", ""),
+        "display_name": item.get("display_name", ""),
+        "allowed_roles": item.get("allowed_roles", []),
+        "status": item.get("status", "UPLOADED"),
+        "chunk_count": int(item.get("chunk_count", 0)),
+        "file_size": int(item.get("file_size", 0)),
+        "uploaded_at": item.get("uploaded_at", ""),
+        "ingested_at": item.get("ingested_at"),
+        "error_msg": item.get("error_msg"),
+    }
+    # allowed_roles may be stored as JSON string (legacy) or list
+    if isinstance(d["allowed_roles"], str):
+        d["allowed_roles"] = json.loads(d["allowed_roles"])
     return d
 
 
@@ -45,89 +72,82 @@ def register_document(
     display_name: str,
     allowed_roles: list[str],
     file_size: int,
-) -> int:
-    con = sqlite3.connect(DB_PATH)
-    cur = con.execute(
-        """INSERT INTO documents (filename, display_name, allowed_roles, file_size)
-           VALUES (?, ?, ?, ?)""",
-        (filename, display_name, json.dumps(allowed_roles), file_size),
-    )
-    doc_id = cur.lastrowid
-    con.commit()
-    con.close()
+) -> str:
+    doc_id = str(uuid.uuid4())
+    _get_table().put_item(Item={
+        "id": doc_id,
+        "filename": filename,
+        "display_name": display_name,
+        "allowed_roles": allowed_roles,
+        "status": "UPLOADED",
+        "chunk_count": 0,
+        "file_size": file_size,
+        "uploaded_at": datetime.utcnow().isoformat(),
+        "ingested_at": None,
+        "error_msg": None,
+    })
     return doc_id
 
 
 def get_all_documents() -> list[dict]:
-    con = sqlite3.connect(DB_PATH)
-    rows = con.execute(
-        "SELECT * FROM documents ORDER BY uploaded_at DESC"
-    ).fetchall()
-    con.close()
-    return [_row_to_dict(r) for r in rows]
+    resp = _get_table().scan()
+    items = resp.get("Items", [])
+    docs = [_item_to_dict(i) for i in items]
+    docs.sort(key=lambda d: d.get("uploaded_at", ""), reverse=True)
+    return docs
 
 
 def get_pending_documents() -> list[dict]:
-    con = sqlite3.connect(DB_PATH)
-    rows = con.execute(
-        "SELECT * FROM documents WHERE status = 'UPLOADED'"
-    ).fetchall()
-    con.close()
-    return [_row_to_dict(r) for r in rows]
+    return [d for d in get_all_documents() if d["status"] == "UPLOADED"]
 
 
 def get_ingested_documents() -> list[dict]:
-    con = sqlite3.connect(DB_PATH)
-    rows = con.execute(
-        "SELECT * FROM documents WHERE status = 'INGESTED'"
-    ).fetchall()
-    con.close()
-    return [_row_to_dict(r) for r in rows]
+    return [d for d in get_all_documents() if d["status"] == "INGESTED"]
 
 
 def get_allowed_roles_map() -> dict[str, list[str]]:
     """Returns { filename: [roles] } for all INGESTED documents."""
-    con = sqlite3.connect(DB_PATH)
-    rows = con.execute(
-        "SELECT filename, allowed_roles FROM documents WHERE status = 'INGESTED'"
-    ).fetchall()
-    con.close()
-    return {row[0]: json.loads(row[1]) for row in rows}
+    return {
+        d["filename"]: d["allowed_roles"]
+        for d in get_all_documents()
+        if d["status"] == "INGESTED"
+    }
 
 
-def set_status_ingesting(doc_id: int) -> None:
+def set_status_ingesting(doc_id: str) -> None:
     _update_status(doc_id, "INGESTING")
 
 
-def set_status_ingested(doc_id: int, chunk_count: int) -> None:
-    con = sqlite3.connect(DB_PATH)
-    con.execute(
-        "UPDATE documents SET status='INGESTED', chunk_count=?, ingested_at=? WHERE id=?",
-        (chunk_count, datetime.utcnow().isoformat(), doc_id),
+def set_status_ingested(doc_id: str, chunk_count: int) -> None:
+    _get_table().update_item(
+        Key={"id": doc_id},
+        UpdateExpression="SET #s = :s, chunk_count = :c, ingested_at = :t",
+        ExpressionAttributeNames={"#s": "status"},
+        ExpressionAttributeValues={
+            ":s": "INGESTED",
+            ":c": chunk_count,
+            ":t": datetime.utcnow().isoformat(),
+        },
     )
-    con.commit()
-    con.close()
 
 
-def set_status_failed(doc_id: int, error: str) -> None:
-    con = sqlite3.connect(DB_PATH)
-    con.execute(
-        "UPDATE documents SET status='FAILED', error_msg=? WHERE id=?",
-        (error, doc_id),
+def set_status_failed(doc_id: str, error: str) -> None:
+    _get_table().update_item(
+        Key={"id": doc_id},
+        UpdateExpression="SET #s = :s, error_msg = :e",
+        ExpressionAttributeNames={"#s": "status"},
+        ExpressionAttributeValues={":s": "FAILED", ":e": error},
     )
-    con.commit()
-    con.close()
 
 
-def delete_document(doc_id: int) -> None:
-    con = sqlite3.connect(DB_PATH)
-    con.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
-    con.commit()
-    con.close()
+def delete_document(doc_id: str) -> None:
+    _get_table().delete_item(Key={"id": doc_id})
 
 
-def _update_status(doc_id: int, status: str) -> None:
-    con = sqlite3.connect(DB_PATH)
-    con.execute("UPDATE documents SET status=? WHERE id=?", (status, doc_id))
-    con.commit()
-    con.close()
+def _update_status(doc_id: str, status: str) -> None:
+    _get_table().update_item(
+        Key={"id": doc_id},
+        UpdateExpression="SET #s = :s",
+        ExpressionAttributeNames={"#s": "status"},
+        ExpressionAttributeValues={":s": status},
+    )

@@ -49,6 +49,10 @@ class Settings(BaseSettings):
         "If not found after two searches, say so clearly."
     )
 
+    # DynamoDB
+    dynamo_table: str = "hm-documents"
+    dynamo_region: str = "ap-south-1"
+
     # Data
     data_dir: str = "data"
     vector_store_dir: str = "vector_store"
