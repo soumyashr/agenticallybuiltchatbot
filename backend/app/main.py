@@ -17,9 +17,11 @@ app = FastAPI(
     version="1.0.0",
 )
 
+from app.config import settings
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:3001", "https://c2cnjknssm.ap-south-1.awsapprunner.com"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

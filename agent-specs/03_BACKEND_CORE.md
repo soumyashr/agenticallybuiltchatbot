@@ -553,6 +553,27 @@ uvicorn app.main:app --reload --port 8000
 
 ---
 
+## CORS Configuration
+
+CORS origins are configured in `backend/app/config.py` as `cors_origins`
+and referenced by `main.py` via `settings.cors_origins`.
+
+**Allowed origins (default):**
+- `http://localhost:3000` — local React dev server
+- `http://localhost:5173` — Vite dev server
+- `http://localhost:3001` — alternate local port
+- `https://gazfq7ai7a.ap-south-1.awsapprunner.com` — production frontend (App Runner)
+
+**Important:**
+- The **frontend** App Runner URL must be in this list. The backend URL should NOT be.
+- `curl` bypasses CORS entirely — browser testing is required to validate CORS.
+  A curl-based smoke test will never catch a missing origin.
+- To add origins without a code change, set `CORS_ORIGINS` env var as a JSON array.
+- Regression tests: `backend/tests/test_cors.py` (5 tests covering preflight,
+  actual requests, rejected origins, and config validation).
+
+---
+
 ## Deployment Prerequisites — DynamoDB Tables
 
 The App Runner IAM role (`apprunner-hm-instance-role`) does **NOT** have

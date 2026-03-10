@@ -9,10 +9,10 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 133 |
-| Pass | 133 |
+| Total tests | 138 |
+| Pass | 138 |
 | Fail | 0 |
-| Test files | 8 |
+| Test files | 9 |
 | Python | 3.11.9 |
 | Runner | pytest 9.0.2 |
 
@@ -20,8 +20,8 @@ Both provider configurations tested:
 
 | Provider | Tests | Passed | Failed |
 |----------|-------|--------|--------|
-| AI_PROVIDER=openai | 133 | 133 | 0 |
-| AI_PROVIDER=azure_openai | 133 | 133 | 0 |
+| AI_PROVIDER=openai | 138 | 138 | 0 |
+| AI_PROVIDER=azure_openai | 138 | 138 | 0 |
 
 ---
 
@@ -155,6 +155,21 @@ at HTTP layer via TestClient, not only at module level.
 
 AI_PROVIDER coverage: provider-agnostic (mocks LLM at function level).
 
+### 9. test_cors.py (5 tests)
+
+Covers: CORS header validation via FastAPI TestClient preflight and actual requests.
+
+| Class | Tests | Coverage |
+|-------|-------|----------|
+| TestCORSHeaders | 5 | Preflight from frontend origin, preflight from localhost, rejected unknown origin, actual request CORS header, config contains frontend URL |
+
+NOTE: CORS tests added after production incident — curl bypasses CORS so
+browser-only failures are invisible to curl-based smoke tests. The frontend
+App Runner URL was missing from allow_origins; only discovered when opening
+the browser UI. Lesson: always test CORS at the HTTP layer, not just via curl.
+
+AI_PROVIDER coverage: provider-independent (CORS is infrastructure-level).
+
 ---
 
 ## Key Tests for AI_PROVIDER Switching
@@ -249,4 +264,4 @@ cd backend && python3 -m pytest tests/test_document_store.py -v
 
 ## Known Issues
 
-None. All 133 tests pass for both AI_PROVIDER values.
+None. All 138 tests pass for both AI_PROVIDER values.

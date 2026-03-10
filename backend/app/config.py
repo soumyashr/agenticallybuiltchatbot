@@ -63,6 +63,14 @@ class Settings(BaseSettings):
     slack_webhook_url: str = ""
     escalation_enabled: bool = True
 
+    # CORS
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:3001",
+        "https://gazfq7ai7a.ap-south-1.awsapprunner.com",
+    ]
+
     # UC-14 Guardrails
     guardrail_max_length: int = 2000
     guardrail_layer2_enabled: bool = True
