@@ -221,7 +221,8 @@ def _build_embeddings():
         return AzureOpenAIEmbeddings(
             azure_deployment=settings.azure_openai_embedding_deployment,
             azure_endpoint=settings.azure_openai_endpoint,
-            openai_api_key=settings.openai_api_key,
+            api_key=settings.azure_openai_api_key,
+            api_version=settings.azure_openai_api_version,
         )
     raise ValueError(f"Unknown AI_PROVIDER: '{provider}'")
 
@@ -235,12 +236,15 @@ def get_vector_store():
     embeddings = _build_embeddings()
 
     if provider == "azure_openai":
-        from azure.search.documents import SearchClient
-        from azure.core.credentials import AzureKeyCredential
-        log.info("Using Azure AI Search as vector store.")
-        # Azure AI Search is accessed directly via SearchClient in tools.py;
-        # return a marker or the search client as needed by your implementation.
-        return "azure_ai_search"
+        from langchain_community.vectorstores import AzureSearch
+        embeddings = _build_embeddings()
+        log.info("VectorStore: Azure AI Search (index=%s)", settings.azure_search_index)
+        return AzureSearch(
+            azure_search_endpoint=settings.azure_search_endpoint,
+            azure_search_key=settings.azure_search_admin_key,
+            index_name=settings.azure_search_index,
+            embedding_function=embeddings.embed_query,
+        )
 
     # Default: FAISS
     from langchain_community.vectorstores import FAISS
@@ -298,10 +302,7 @@ def run_pending() -> None:
             log.error(f"Failed to ingest '{filename}': {exc}")
 
     if all_chunks:
-        if settings.ai_provider.lower() == "azure_openai":
-            _build_azure_search(all_chunks)
-        else:
-            _build_faiss(all_chunks)
+        _build_index(all_chunks)
     reload_vector_store()
 
 
@@ -312,20 +313,17 @@ def run_after_delete() -> None:
     """
     chunks = _load_ingested_chunks()
     if chunks:
-        if settings.ai_provider.lower() == "azure_openai":
-            _build_azure_search(chunks)
-        else:
-            _build_faiss(chunks)
+        _build_index(chunks)
     else:
-        if settings.ai_provider.lower() == "azure_openai":
-            log.info("All documents deleted — Azure AI Search index cleared.")
-        else:
+        provider = settings.ai_provider.lower()
+        if provider != "azure_openai":
+            # Only delete local FAISS files; Azure Search index persists
             import shutil
             vs_path = settings.vector_store_dir
             if os.path.exists(vs_path):
                 shutil.rmtree(vs_path)
                 os.makedirs(vs_path, exist_ok=True)
-            log.info("All documents deleted — FAISS index removed.")
+        log.info("All documents deleted — index cleared.")
     reload_vector_store()
 
 
@@ -375,41 +373,92 @@ def _load_pdf(filepath: str, filename: str, allowed_roles: list) -> list:
     return chunks
 
 
-def _build_faiss(chunks: list) -> None:
+def _build_index(chunks: list) -> None:
+    """Build and persist the vector index from chunks."""
+    provider = settings.ai_provider.lower()
+    embeddings = _build_embeddings()
+
+    if provider == "azure_openai":
+        _push_to_azure_search(chunks, embeddings)
+    else:
+        _build_faiss(chunks, embeddings)
+
+
+def _build_faiss(chunks: list, embeddings) -> None:
     """Embed all chunks and persist FAISS index to disk."""
     from langchain_community.vectorstores import FAISS
 
-    embeddings = _build_embeddings()
     os.makedirs(settings.vector_store_dir, exist_ok=True)
     vs = FAISS.from_documents(chunks, embeddings)
     vs.save_local(settings.vector_store_dir)
     log.info(f"FAISS index saved: {len(chunks)} total chunks.")
 
 
-def _build_azure_search(chunks: list) -> None:
-    """Create Azure AI Search index and upsert all document chunks."""
+def _push_to_azure_search(chunks: list, embeddings) -> None:
+    """Push document chunks to Azure AI Search index (create if not exists)."""
+    from azure.core.credentials import AzureKeyCredential
     from azure.search.documents import SearchClient
     from azure.search.documents.indexes import SearchIndexClient
-    from azure.core.credentials import AzureKeyCredential
+    from azure.search.documents.indexes.models import (
+        SearchIndex, SimpleField, SearchableField, SearchField,
+        SearchFieldDataType, VectorSearch,
+        HnswAlgorithmConfiguration, VectorSearchProfile,
+    )
+    import hashlib
 
     credential = AzureKeyCredential(settings.azure_search_admin_key)
-    embeddings = _build_embeddings()
+    index_name = settings.azure_search_index
 
-    # Create or update the search index
+    # Create index if it doesn't exist
     index_client = SearchIndexClient(
-        endpoint=settings.azure_search_endpoint,
-        credential=credential,
+        endpoint=settings.azure_search_endpoint, credential=credential,
     )
-    # Index creation logic: define fields (id, content, source, page,
-    # allowed_roles, embedding vector) and create if not exists.
-    # Then upsert documents with embeddings to Azure AI Search.
+    index_def = SearchIndex(
+        name=index_name,
+        fields=[
+            SimpleField(name="id", type=SearchFieldDataType.String, key=True, filterable=True),
+            SearchableField(name="content", type=SearchFieldDataType.String),
+            SimpleField(name="source", type=SearchFieldDataType.String, filterable=True),
+            SimpleField(name="page", type=SearchFieldDataType.Int32, filterable=True),
+            SimpleField(name="allowed_roles",
+                type=SearchFieldDataType.Collection(SearchFieldDataType.String), filterable=True),
+            SearchField(name="content_vector",
+                type=SearchFieldDataType.Collection(SearchFieldDataType.Single),
+                searchable=True, vector_search_dimensions=1536,
+                vector_search_profile_name="default-profile"),
+        ],
+        vector_search=VectorSearch(
+            algorithms=[HnswAlgorithmConfiguration(name="default-algorithm")],
+            profiles=[VectorSearchProfile(name="default-profile",
+                algorithm_configuration_name="default-algorithm")],
+        ),
+    )
+    index_client.create_or_update_index(index_def)
+    log.info("Azure Search index '%s' ready.", index_name)
+
+    # Upsert documents in batches
     search_client = SearchClient(
         endpoint=settings.azure_search_endpoint,
-        index_name=settings.azure_search_index,
-        credential=credential,
+        index_name=index_name, credential=credential,
     )
-    # Upsert chunks with their embeddings
-    log.info(f"Azure AI Search: upserting {len(chunks)} chunks to index '{settings.azure_search_index}'.")
+    batch = []
+    for i, chunk in enumerate(chunks):
+        content = chunk.page_content
+        source = chunk.metadata.get("source", "unknown")
+        page = chunk.metadata.get("page", 0)
+        roles = chunk.metadata.get("allowed_roles", [])
+        if isinstance(roles, str):
+            import json; roles = json.loads(roles)
+        doc_id = hashlib.sha256(f"{source}:{page}:{i}:{content[:100]}".encode()).hexdigest()[:32]
+        vector = embeddings.embed_query(content)
+        batch.append({"id": doc_id, "content": content, "source": source,
+            "page": int(page) if page else 0, "allowed_roles": roles,
+            "content_vector": vector})
+        if len(batch) >= 100:
+            search_client.upload_documents(documents=batch); batch = []
+    if batch:
+        search_client.upload_documents(documents=batch)
+    log.info("Azure Search: upserted %d chunks to index '%s'.", len(chunks), index_name)
 ```
 
 ---

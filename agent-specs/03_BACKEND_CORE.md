@@ -73,9 +73,11 @@ EMBEDDING_MODEL=text-embedding-ada-002
 OPENAI_API_KEY=sk-your-key-here
 
 # ── Azure OpenAI (only if AI_PROVIDER=azure_openai) ─
-AZURE_OPENAI_ENDPOINT=
-AZURE_OPENAI_DEPLOYMENT=
-AZURE_OPENAI_EMBEDDING_DEPLOYMENT=
+AZURE_OPENAI_API_KEY=your-azure-openai-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT=gpt-4o
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
+AZURE_OPENAI_API_VERSION=2024-08-01-preview
 
 # ── Azure AI Search (only if AI_PROVIDER=azure_openai) ─
 AZURE_SEARCH_ENDPOINT=
@@ -122,7 +124,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # AI Provider (single flag switches LLM + embeddings + vector store)
-    ai_provider: str = "openai"  # "openai" or "azure_openai"
+    ai_provider: str = "azure_openai"  # "openai" or "azure_openai"
 
     # LLM
     llm_model: str = "gpt-4o"
@@ -135,14 +137,16 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
 
     # Azure OpenAI
+    azure_openai_api_key: str = ""
     azure_openai_endpoint: str = ""
     azure_openai_deployment: str = ""
-    azure_openai_embedding_deployment: str = ""
+    azure_openai_embedding_deployment: str = "text-embedding-3-small"
+    azure_openai_api_version: str = "2024-08-01-preview"
 
     # Azure AI Search
     azure_search_endpoint: str = ""
     azure_search_admin_key: str = ""
-    azure_search_index: str = ""
+    azure_search_index: str = "hm-knowledge-hub"
 
     # Auth
     jwt_secret: str = "AgenticallyBuiltChatBot-secret-change-in-production"
@@ -233,7 +237,7 @@ class ChatResponse(BaseModel):
 
 
 class DocumentStatusResponse(BaseModel):
-    id: int
+    id: str
     status: str
     chunk_count: int
     error_msg: Optional[str] = None
@@ -453,7 +457,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:3001",
-        "https://gazfq7ai7a.ap-south-1.awsapprunner.com",
+        "https://c2cnjknssm.ap-south-1.awsapprunner.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],

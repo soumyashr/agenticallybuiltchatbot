@@ -41,7 +41,7 @@ class ChatResponse(BaseModel):
 
 
 class DocumentStatusResponse(BaseModel):
-    id: int
+    id: str
     status: str
     chunk_count: int
     error_msg: Optional[str] = None

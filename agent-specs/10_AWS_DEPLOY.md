@@ -24,7 +24,7 @@ Local Mac  →  docker build  →  ECR (image registry)
                               AWS App Runner
                               (fully managed, auto-scaling)
                               HTTPS by default
-                              URL: https://gazfq7ai7a.ap-south-1.awsapprunner.com
+                              URL: https://c2cnjknssm.ap-south-1.awsapprunner.com
 ```
 
 ### App Runner Backend Environment Variables
@@ -70,7 +70,7 @@ on redeployment. However, document metadata now persists in DynamoDB
 
 CORS in `main.py` includes the App Runner URL:
 ```python
-allow_origins=[..., "https://gazfq7ai7a.ap-south-1.awsapprunner.com"]
+allow_origins=[..., "https://c2cnjknssm.ap-south-1.awsapprunner.com"]
 ```
 
 ---

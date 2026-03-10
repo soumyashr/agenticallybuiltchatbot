@@ -58,7 +58,7 @@ class AgentParseError(Exception):
 
 
 class AgentRetrievalError(Exception):
-    """Raised when vector store retrieval fails after retries."""
+    """Raised when FAISS retrieval fails after retries."""
 
 
 class AgentAccessError(Exception):
@@ -103,11 +103,12 @@ def _build_llm():
 
     elif provider == "azure_openai":
         from langchain_openai import AzureChatOpenAI
-        log.info(f"LLM: Azure OpenAI ({settings.llm_model})")
+        log.info("LLM: Azure OpenAI (%s)", settings.azure_openai_deployment)
         return AzureChatOpenAI(
-            azure_deployment=settings.azure_openai_deployment or settings.llm_model,
+            azure_deployment=settings.azure_openai_deployment,
             azure_endpoint=settings.azure_openai_endpoint,
-            openai_api_key=settings.openai_api_key,
+            api_key=settings.azure_openai_api_key,
+            api_version=settings.azure_openai_api_version,
             temperature=settings.llm_temperature,
         )
 
@@ -255,24 +256,24 @@ def _extract_sources(intermediate_steps: list[Any]) -> list[SourceDoc]:
     return sources
 
 
-# ── Direct vector store fallback ──────────────────────────────
+# ── Direct FAISS fallback ────────────────────────────────────
 
-async def _direct_vector_search(
+async def _direct_faiss_search(
     message: str,
     role: Role,
 ) -> dict:
     """
-    Last-resort fallback: bypass agent, call vector store directly,
+    Last-resort fallback: bypass agent, call FAISS directly,
     then synthesise an answer with a single LLM call.
     """
-    log.warning("Using direct vector store fallback for: %s", message[:80])
+    log.warning("Using direct FAISS fallback for: %s", message[:80])
     tools = make_search_tools(user_role=role.value)
     search_tool = tools[0]
 
     try:
         search_result = search_tool.func(message)
     except Exception as exc:
-        log.error("Direct vector store search failed: %s", exc)
+        log.error("Direct FAISS search failed: %s", exc)
         return {
             "answer": "I could not find information on this topic in the documents accessible to you.",
             "sources": [],
@@ -344,7 +345,7 @@ async def chat(
     """
     Main entry point. Returns dict matching ChatResponse model.
     Retries on agent parse failures up to MAX_AGENT_RETRIES times.
-    Falls back to direct vector store search if all retries are exhausted.
+    Falls back to direct FAISS search if all retries are exhausted.
     """
     executor = get_or_create_session(session_id, role)
 
@@ -379,7 +380,7 @@ async def chat(
                     "error_type":      None,
                 }
 
-            # Fallback phrase but vector store actually ran — genuine not-found
+            # Fallback phrase but FAISS actually ran — genuine not-found
             if _has_sources(intermediate):
                 return {
                     "answer":          answer,
@@ -391,7 +392,7 @@ async def chat(
                     "error_type":      None,
                 }
 
-            # Fallback phrase and vector store never ran — parse failure, retry
+            # Fallback phrase and FAISS never ran — parse failure, retry
             log.warning(
                 "Agent parse failure (attempt %d/%d): %s",
                 attempt, MAX_AGENT_RETRIES, answer[:100],
@@ -410,9 +411,9 @@ async def chat(
             )
             last_answer = str(exc)
 
-    # All retries exhausted — fall back to direct vector store search
-    log.warning("All %d retries exhausted, using direct vector store fallback.", MAX_AGENT_RETRIES)
-    fallback_result = await _direct_vector_search(message, role)
+    # All retries exhausted — fall back to direct FAISS search
+    log.warning("All %d retries exhausted, using direct FAISS fallback.", MAX_AGENT_RETRIES)
+    fallback_result = await _direct_faiss_search(message, role)
     fallback_result["session_id"] = session_id
     fallback_result["role"] = role.value
     return fallback_result
@@ -430,7 +431,7 @@ The `chat()` function implements a multi-layer reliability strategy:
 - **Genuine not-found**: Fallback phrase detected BUT `_has_sources()` is True (vector store ran and returned results) — accept the answer, no retry.
 - **Parse failure**: Fallback phrase detected AND `_has_sources()` is False (vector store never ran) — retry.
 
-### Direct Vector Store Fallback (`_direct_vector_search`)
+### Direct Vector Store Fallback (`_direct_faiss_search`)
 If all retries are exhausted, the system bypasses the ReAct agent entirely:
 1. Calls the vector store directly via the search tool
 2. Parses sources from the raw search result

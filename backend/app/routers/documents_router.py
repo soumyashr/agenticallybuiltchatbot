@@ -55,7 +55,7 @@ async def upload_document(
     admin: dict = Depends(require_admin),
 ):
     """
-    Upload a PDF and register it in documents.db (status=UPLOADED).
+    Upload a PDF and register it in DynamoDB (status=UPLOADED).
     allowed_roles: JSON string e.g. '["admin","faculty"]'
     """
     # Validate file type
@@ -134,7 +134,7 @@ def list_documents(admin: dict = Depends(require_admin)):
 def ingest_documents(admin: dict = Depends(require_admin)):
     """
     Ingest all UPLOADED documents.
-    Rebuilds the full FAISS index.
+    Rebuilds the full vector index (FAISS or Azure AI Search, per AI_PROVIDER).
     """
     pending = get_pending_documents()
     if not pending:
@@ -157,7 +157,7 @@ def ingest_documents(admin: dict = Depends(require_admin)):
 def delete_doc(doc_id: str, admin: dict = Depends(require_admin)):
     """
     Delete a document record from DB + its PDF file from disk.
-    If the document was INGESTED, rebuilds FAISS index without it.
+    If the document was INGESTED, rebuilds vector index without it.
     """
     docs = get_all_documents()
     doc  = next((d for d in docs if d["id"] == doc_id), None)
@@ -177,10 +177,10 @@ def delete_doc(doc_id: str, admin: dict = Depends(require_admin)):
     delete_document(doc_id)
     log.info(f"Deleted document record: id={doc_id}")
 
-    # Rebuild FAISS if the doc was part of the index
+    # Rebuild vector index if the doc was part of the index
     if was_ingested:
         run_after_delete()
-        log.info("FAISS index rebuilt after deletion.")
+        log.info("Vector index rebuilt after deletion.")
 
     return {"deleted": doc_id, "filename": doc["filename"]}
 

@@ -119,7 +119,7 @@
 7.  For each UPLOADED document:
     a.  PyPDFLoader loads pages
     b.  RecursiveCharacterTextSplitter → chunks (1000 chars, 200 overlap)
-    c.  Each chunk.metadata["allowed_roles"] = roles from documents.db
+    c.  Each chunk.metadata["allowed_roles"] = roles from DynamoDB
     d.  Embeddings generated (OpenAI or Azure OpenAI, per AI_PROVIDER)
     e.  AI_PROVIDER=openai: FAISS index rebuilt with ALL ingested chunks
         AI_PROVIDER=azure_openai: Azure AI Search index created + documents upserted
