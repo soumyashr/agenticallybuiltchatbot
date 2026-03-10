@@ -9,8 +9,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 186 |
-| Pass | 186 |
+| Total tests | 190 |
+| Pass | 190 |
 | Fail | 0 |
 | Test files | 10 |
 | Python | 3.11.9 |
@@ -20,14 +20,14 @@ Both provider configurations tested:
 
 | Provider | Tests | Passed | Failed |
 |----------|-------|--------|--------|
-| AI_PROVIDER=openai | 186 | 186 | 0 |
-| AI_PROVIDER=azure_openai | 186 | 186 | 0 |
+| AI_PROVIDER=openai | 190 | 190 | 0 |
+| AI_PROVIDER=azure_openai | 190 | 190 | 0 |
 
 ---
 
 ## Test Files
 
-### 1. test_agent_logic.py (74 tests)
+### 1. test_agent_logic.py (76 tests)
 
 Covers: agent retry logic, RBAC filtering, document ingest, chat endpoint,
 GET /documents/my sidebar endpoint.
@@ -53,7 +53,7 @@ AC tags used: `# AC: UIB-140-AC1` through `# AC: UIB-140-AC6`,
 
 | TestRBACCitationFilter | 6 | RBAC citation filter: UIB-31 (role filtering), UIB-35 (no restricted docs), UIB-44 (neutral=empty sources), UIB-40 (fallback=empty), UIB-52 (admin sees all), regression guard |
 | TestSessionTTLUC07 | 6 | Session TTL: expired eviction, valid preservation, explicit clear, TTL configurable, no cross-session leak, fresh context after expiry |
-| TestCitationFormatUC02 | 7 | Citation format enrichment: display_name populated, uploaded_at populated, unknown file stays raw, metadata error returns raw, _extract_sources enriches, empty sources no call, SourceDoc new fields optional |
+| TestCitationFormatUC02 | 9 | Citation format enrichment: display_name populated, uploaded_at populated, unknown file stays raw, metadata error returns raw, extract+enrich pipeline, empty sources no call, SourceDoc new fields optional, faculty role enrichment (PROD1), all-paths consistency (PROD2) |
 
 AI_PROVIDER coverage: provider-agnostic (mocks LLM/tools at function level).
 
@@ -179,7 +179,7 @@ the browser UI. Lesson: always test CORS at the HTTP layer, not just via curl.
 
 AI_PROVIDER coverage: provider-independent (CORS is infrastructure-level).
 
-### 10. test_workflow_guard.py (17 tests)
+### 10. test_workflow_guard.py (19 tests)
 
 Covers: UC-12 workflow execution prevention — pattern detection, configurable patterns, HTTP endpoint integration, escalation logging.
 
@@ -187,7 +187,7 @@ Covers: UC-12 workflow execution prevention — pattern detection, configurable 
 |-------|-------|----------|
 | TestWorkflowDetection | 10 | submit/approve/apply/process/enroll detection, case-insensitive, informational queries pass, exception contains pattern |
 | TestWorkflowConfig | 3 | Custom patterns override, empty config uses defaults, pipe-separated patterns |
-| TestWorkflowEndpointIntegration | 4 | Refusal response returned (agent not called), blocked for admin too, informational reaches agent, escalation logged |
+| TestWorkflowEndpointIntegration | 6 | Refusal response returned (agent not called), blocked for admin too, informational reaches agent, escalation logged, production regression — intercepted before agent (PROD1), patterns loaded from config (PROD2) |
 
 AI_PROVIDER coverage: provider-independent (workflow guard is pre-agent infrastructure).
 
@@ -285,4 +285,4 @@ cd backend && python3 -m pytest tests/test_document_store.py -v
 
 ## Known Issues
 
-None. All 186 tests pass for both AI_PROVIDER values.
+None. All 190 tests pass for both AI_PROVIDER values.

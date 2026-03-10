@@ -297,7 +297,7 @@ def _extract_sources(intermediate_steps: list[Any]) -> list[SourceDoc]:
             snippet = " ".join(lines[1:])[:200] + "…" if len(lines) > 1 else ""
             sources.append(SourceDoc(source=source_name, page=page, snippet=snippet))
 
-    return _enrich_sources(sources)
+    return sources
 
 
 # ── Post-generation RBAC filter on citations ─────────────────
@@ -384,8 +384,6 @@ async def _direct_faiss_search(
             snippet = " ".join(lines[1:])[:200] + "…" if len(lines) > 1 else ""
             sources.append(SourceDoc(source=source_name, page=page, snippet=snippet))
 
-    sources = _enrich_sources(sources)
-
     # Single LLM call to synthesise
     llm = _build_llm()
     synthesis_prompt = (
@@ -405,6 +403,7 @@ async def _direct_faiss_search(
         answer = "I found relevant documents but could not generate a summary. Please try again."
 
     safe_sources = _filter_sources_by_role(sources, role.value)
+    safe_sources = _enrich_sources(safe_sources)
     return {
         "answer": answer,
         "sources": [s.dict() for s in safe_sources],
@@ -484,6 +483,7 @@ async def chat(
             # Clean response — return immediately
             if not _is_fallback_response(answer):
                 safe_sources = _filter_sources_by_role(sources, role.value)
+                safe_sources = _enrich_sources(safe_sources)
                 return {
                     "answer":          answer,
                     "session_id":      session_id,

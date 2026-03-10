@@ -187,3 +187,29 @@ class TestWorkflowEndpointIntegration:
         mock_esc.assert_called_once()
         args = mock_esc.call_args
         assert args[0][3] == "workflow_attempt_blocked"  # reason
+
+    # AC: UIB-148-PROD1 — workflow intercepted before agent runs
+    @patch("app.routers.chat_router.agent_chat")
+    @patch("app.routers.chat_router.save_escalation")
+    def test_workflow_intercepted_before_agent(self, mock_esc, mock_agent):
+        """Production regression: 'submit my leave form now' must block before agent."""
+        resp = self.client.post(
+            "/chat",
+            json={"message": "submit my leave form now", "session_id": "wf-prod1"},
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
+        assert resp.status_code == 200
+        # Agent must NEVER be called — workflow guard fires first
+        mock_agent.assert_not_called()
+        # Response must be the refusal, not "could not find"
+        assert "could not find" not in resp.json()["answer"].lower()
+
+    # AC: UIB-148-PROD2 — workflow patterns loaded from config
+    def test_workflow_patterns_loaded_from_config(self):
+        """Default patterns are non-empty and contain expected keywords."""
+        patterns = _get_patterns()
+        assert len(patterns) > 0
+        # Verify key action verbs are covered by at least one pattern
+        pattern_text = " ".join(p.pattern for p in patterns)
+        for keyword in ["submit", "approve", "enroll"]:
+            assert keyword in pattern_text.lower(), f"Missing keyword: {keyword}"

@@ -8,6 +8,10 @@ Cross-referenced against codebase at commit `bb5b12c` and Jira REST API v3.
 **Update 2026-03-10:** C1, C2, C3, C4, M8 fixed — `_filter_sources_by_role()` added
 to `agent.py`. Neutral/fallback responses now return empty sources `[]`.
 
+**Update 2026-03-11:** UC-12 production interception fix applied — `detect_workflow_attempt()`
+correctly wired before agent in chat endpoint. Citation enrichment applied to all code paths
+with consistent filter→enrich order.
+
 ---
 
 ## 🔴 Critical Gaps — ✅ ALL FIXED

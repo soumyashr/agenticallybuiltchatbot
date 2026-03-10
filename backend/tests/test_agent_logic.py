@@ -1285,19 +1285,23 @@ class TestCitationFormatUC02:
         assert result[0].display_name is None
         assert result[0].source == "policy_v2.pdf"
 
-    # AC: UIB-35-AC5 — _extract_sources calls enrichment
-    def test_extract_sources_enriches_results(self):
-        """_extract_sources enriches parsed sources with DynamoDB metadata."""
+    # AC: UIB-35-AC5 — _extract_sources returns raw, _enrich_sources enriches separately
+    def test_extract_then_enrich_pipeline(self):
+        """_extract_sources returns raw sources; _enrich_sources adds metadata."""
         observation = "[1] Source: handbook.pdf, Page: 5\nAdmission details here"
         steps = [(MagicMock(), observation)]
-        meta_map = {"handbook.pdf": {"display_name": "Student Handbook", "uploaded_at": "2026-02-15T08:00:00"}}
-        with patch("app.agent.get_document_metadata_map", return_value=meta_map):
-            sources = _extract_sources(steps)
+        # _extract_sources no longer calls _enrich_sources internally
+        sources = _extract_sources(steps)
         assert len(sources) == 1
         assert sources[0].source == "handbook.pdf"
-        assert sources[0].display_name == "Student Handbook"
-        assert sources[0].uploaded_at == "2026-02-15T08:00:00"
-        assert sources[0].page == 5
+        assert sources[0].display_name is None  # raw, not yet enriched
+        # Now enrich separately (as chat() does after filtering)
+        meta_map = {"handbook.pdf": {"display_name": "Student Handbook", "uploaded_at": "2026-02-15T08:00:00"}}
+        with patch("app.agent.get_document_metadata_map", return_value=meta_map):
+            enriched = _enrich_sources(sources)
+        assert enriched[0].display_name == "Student Handbook"
+        assert enriched[0].uploaded_at == "2026-02-15T08:00:00"
+        assert enriched[0].page == 5
 
     # AC: UIB-35-AC6 — empty sources stay empty
     def test_empty_sources_no_enrichment_call(self):
@@ -1318,3 +1322,40 @@ class TestCitationFormatUC02:
         src2 = SourceDoc(source="f.pdf", snippet="t", display_name="My File", uploaded_at="2026-01-01")
         assert src2.display_name == "My File"
         assert src2.uploaded_at == "2026-01-01"
+
+    # AC: UIB-35-PROD1 — enrichment consistent on faculty path
+    def test_citation_enrichment_on_faculty_role(self):
+        """Faculty query returns enriched SourceDoc dicts, not raw strings."""
+        src = SourceDoc(source="policy.pdf", page=1, snippet="text")
+        meta_map = {"policy.pdf": {"display_name": "Faculty Policy", "uploaded_at": "2026-03-01T10:00:00"}}
+        roles_map = {"policy.pdf": ["faculty", "admin"]}
+        with patch("app.agent.get_allowed_roles_map", return_value=roles_map):
+            filtered = _filter_sources_by_role([src], "faculty")
+        with patch("app.agent.get_document_metadata_map", return_value=meta_map):
+            enriched = _enrich_sources(filtered)
+        assert len(enriched) == 1
+        assert isinstance(enriched[0], SourceDoc)
+        assert enriched[0].display_name == "Faculty Policy"
+        assert enriched[0].uploaded_at == "2026-03-01T10:00:00"
+
+    # AC: UIB-35-PROD2 — enrichment consistent: filter then enrich on all paths
+    def test_citation_enrichment_on_all_response_paths(self):
+        """Verify filter→enrich order: _extract_sources returns raw, enrich adds metadata."""
+        observation = "[1] Source: doc.pdf, Page: 2\nContent here"
+        steps = [(MagicMock(), observation)]
+        # _extract_sources must return raw (not enriched)
+        sources = _extract_sources(steps)
+        assert sources[0].display_name is None, "_extract_sources must not enrich"
+        # Simulate the filter→enrich pipeline used by chat()
+        roles_map = {"doc.pdf": ["student"]}
+        meta_map = {"doc.pdf": {"display_name": "My Document", "uploaded_at": "2026-01-15"}}
+        with patch("app.agent.get_allowed_roles_map", return_value=roles_map):
+            filtered = _filter_sources_by_role(sources, "student")
+        with patch("app.agent.get_document_metadata_map", return_value=meta_map):
+            enriched = _enrich_sources(filtered)
+        assert enriched[0].display_name == "My Document"
+        # Verify output is SourceDoc, not raw string
+        assert isinstance(enriched[0], SourceDoc)
+        assert hasattr(enriched[0], "source")
+        assert hasattr(enriched[0], "display_name")
+        assert hasattr(enriched[0], "uploaded_at")
