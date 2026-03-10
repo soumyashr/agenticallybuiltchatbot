@@ -210,3 +210,21 @@ RULE: Lower layers NEVER import from higher layers.
 RULE: Components NEVER call fetch() directly — only through api.js.
 RULE: App.jsx is pure wiring — no business logic, no fetch calls.
 ```
+
+## Jira Mapping
+
+**Covers:** UC-01, UC-02, UC-03
+
+| Story ID | Title | AC | Implementation Status |
+|----------|-------|----|-----------------------|
+| UIB-1 | Access chatbot widget from approved internal systems | 0 | ✅ Implemented |
+| UIB-3 | Seamless SSO-based access to chatbot | 0 | ✅ Implemented |
+| UIB-23 | Retrieve from approved knowledge sources only | 0 | ✅ Implemented |
+| UIB-27 | Apply role/group-based permissions to filter results | 0 | ✅ Implemented |
+| UIB-40 | Filter to authorized documents only | 0 | ✅ Implemented |
+| UIB-52 | Do not reveal restricted titles, locations, snippets, or existence | 0 | ✅ Implemented |
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden

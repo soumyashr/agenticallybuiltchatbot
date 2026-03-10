@@ -121,3 +121,18 @@ Both layers use existing infrastructure:
 | TestLayer2LLMCheck | 5 | UNSAFE blocks, SAFE passes, LLM error fail-open, unexpected response, disabled skip |
 | TestGuardrailIntegration | 2 | Layer 1 blocks before Layer 2, both layers pass |
 | TestGuardrailConfig | 2 | Config defaults verified |
+
+## Jira Mapping
+
+**Covers:** UC-14
+
+| Story ID | Title | AC | Implementation Status |
+|----------|-------|----|-----------------------|
+| UIB-166 | Detect abusive or harmful queries | 0 | ✅ Implemented |
+| UIB-170 | Block or safely respond according to policy | 0 | ✅ Implemented |
+| UIB-174 | Log and optionally escalate security events | 0 | ✅ Implemented |
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden

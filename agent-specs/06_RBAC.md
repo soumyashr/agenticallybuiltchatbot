@@ -202,3 +202,19 @@ All 9 must pass.
 - [ ] admin → Feature_6: ALLOW
 - [ ] admin → Feature_7: ALLOW
 - [ ] Tampered JWT test: modified role claim → 401 Unauthorized
+
+## Jira Mapping
+
+**Covers:** UC-03
+
+| Story ID | Title | AC | Implementation Status |
+|----------|-------|----|-----------------------|
+| UIB-40 | Filter to authorized documents only | 0 | ✅ Implemented |
+| UIB-44 | Neutral response when only restricted documents match | 0 | ✅ Implemented |
+| UIB-48 | Suggest safe next steps (optional, configurable) | 0 | ✅ Implemented |
+| UIB-52 | Do not reveal restricted titles, locations, snippets, or existence | 0 | ✅ Implemented |
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden

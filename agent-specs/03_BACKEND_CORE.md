@@ -613,3 +613,23 @@ See `10_AWS_DEPLOY.md` for the full IAM policy JSON.
 - [ ] Swagger UI loads at `http://localhost:8000/docs`
 - [ ] No import errors in terminal output
 - [ ] Server restarts cleanly after `Ctrl+C` and `uvicorn app.main:app --reload --port 8000`
+
+## Jira Mapping
+
+**Covers:** UC-01, UC-08, UC-10, UC-13, UC-14
+
+| Story ID | Title | AC | Implementation Status |
+|----------|-------|----|-----------------------|
+| UIB-1 | Access chatbot widget from approved internal systems | 0 | ✅ Implemented |
+| UIB-3 | Seamless SSO-based access to chatbot | 0 | ✅ Implemented |
+| UIB-10 | Determine user persona from authentication context | 0 | ✅ Implemented |
+| UIB-14 | Start chatbot interaction on user trigger | 0 | ✅ Implemented |
+| UIB-113 | Detect ambiguous or overly broad queries | 0 | ✅ Implemented |
+| UIB-131 | Detect and log unanswered queries with metadata | 0 | ✅ Implemented |
+| UIB-157 | Detect irrelevant or out-of-scope queries | 0 | ✅ Implemented |
+| UIB-166 | Detect abusive or harmful queries | 0 | ✅ Implemented |
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden

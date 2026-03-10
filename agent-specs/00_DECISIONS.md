@@ -284,3 +284,19 @@ student → Feature_7           : BLOCK (admin only)
 faculty → Feature_7           : BLOCK (admin only)
 admin   → Feature_7           : ALLOW (admin can access)
 ```
+
+## Jira Mapping
+
+**Covers:** UC-01, UC-02, UC-03, UC-16
+
+| Story ID | Title | AC | Implementation Status |
+|----------|-------|----|-----------------------|
+| UIB-1 | Access chatbot widget from approved internal systems | 0 | ✅ Implemented |
+| UIB-10 | Determine user persona from authentication context | 0 | ✅ Implemented |
+| UIB-23 | Retrieve from approved knowledge sources only | 0 | ✅ Implemented |
+| UIB-40 | Filter to authorized documents only | 0 | ✅ Implemented |
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden

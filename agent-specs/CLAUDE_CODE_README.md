@@ -157,3 +157,14 @@ POST   /admin/documents/ingest  → Ingest pending docs (admin only)
 DELETE /admin/documents/{id}    → Delete document (admin only)
 GET    /health                  → Liveness check
 ```
+
+## Jira Mapping
+
+**Covers:** Meta
+
+*No direct Jira story mapping — infrastructure/meta spec.*
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden

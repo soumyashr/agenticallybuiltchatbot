@@ -107,3 +107,31 @@ Domain config     → constants.js, theme.js, .env, documents in data/
 ```
 
 Swapping to a new client = change constants.js + upload new documents. Zero code changes.
+
+## Jira Mapping
+
+**Covers:** UC-01 through UC-16
+
+| Story ID | Title | AC | Implementation Status |
+|----------|-------|----|-----------------------|
+| UIB-2 | Epic: Access Authorized Chatbot Interface (UC-01) | 0 | ✅ Implemented |
+| UIB-22 | Epic: Retrieve Authorized Information (UC-02) | 0 | ✅ Implemented |
+| UIB-39 | Epic: Enforce Document-Level Access Control (UC-03) | 0 | ✅ Implemented |
+| UIB-56 | Epic: Retrieve Latest Document Version (UC-04) | 0 | ⚠️ Partial |
+| UIB-74 | Epic: Handle Multiple Relevant Documents (UC-05) | 0 | ⚠️ Partial |
+| UIB-92 | Epic: Maintain Conversational Context (UC-06) | 0 | ✅ Implemented |
+| UIB-102 | Epic: Reset Context on New Session (UC-07) | 0 | ✅ Implemented |
+| UIB-108 | Epic: Clarify Ambiguous or Broad Queries (UC-08) | 0 | ✅ Implemented |
+| UIB-122 | Epic: Handle No Matching Content (UC-09) | 0 | ✅ Implemented |
+| UIB-130 | Epic: Escalate Unanswered Queries (UC-10) | 0 | ✅ Implemented |
+| UIB-139 | Epic: Informational Guidance for Forms (UC-11) | 0 | ❌ Pending |
+| UIB-147 | Epic: Prevent Workflow Execution (UC-12) | 0 | ❌ Pending |
+| UIB-156 | Epic: Handle Irrelevant Queries (UC-13) | 0 | ✅ Implemented |
+| UIB-165 | Epic: Abuse & Security Guardrails (UC-14) | 0 | ✅ Implemented |
+| UIB-178 | Epic: Capture User Feedback (UC-15) | 0 | ✅ Implemented |
+| UIB-187 | Epic: Admin Console (UC-16) | 0 | ⚠️ Partial |
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden

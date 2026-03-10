@@ -254,3 +254,19 @@ startup. Tables were created manually via AWS CLI before redeploying successfull
 - [ ] Submitting feedback shows "Thanks for your feedback!"
 - [ ] `python3 -m pytest tests/ -v` — all 105 tests pass
 - [ ] `cd frontend && npm run build` — succeeds
+
+## Jira Mapping
+
+**Covers:** UC-10, UC-15
+
+| Story ID | Title | AC | Implementation Status |
+|----------|-------|----|-----------------------|
+| UIB-131 | Detect and log unanswered queries with metadata | 0 | ✅ Implemented |
+| UIB-135 | Route unanswered queries to designated university teams | 0 | ✅ Implemented |
+| UIB-179 | Allow users to rate chatbot responses | 0 | ✅ Implemented |
+| UIB-183 | Capture optional free-text feedback | 0 | ✅ Implemented |
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden

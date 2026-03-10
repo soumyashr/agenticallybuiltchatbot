@@ -688,3 +688,27 @@ arn:aws:dynamodb:ap-south-1:*:table/hm-documents
 - [ ] Faculty role filter test: returns 0 results for feature_7 chunks
 - [ ] Admin role filter test: returns results for all 3 documents
 - [ ] Server restarts without errors after ingest
+
+## Jira Mapping
+
+**Covers:** UC-02, UC-03, UC-04, UC-05
+
+| Story ID | Title | AC | Implementation Status |
+|----------|-------|----|-----------------------|
+| UIB-23 | Retrieve from approved knowledge sources only | 0 | ✅ Implemented |
+| UIB-27 | Apply role/group-based permissions to filter results | 0 | ✅ Implemented |
+| UIB-31 | Generate response using only authorized content | 0 | ✅ Implemented |
+| UIB-35 | Provide citations and links only to authorized documents | 0 | ✅ Implemented |
+| UIB-40 | Filter to authorized documents only | 0 | ✅ Implemented |
+| UIB-44 | Neutral response when only restricted documents match | 0 | ✅ Implemented |
+| UIB-57 | Admin enables governed current/approved retrieval | 0 | ⚠️ Partial |
+| UIB-61 | Use only current, approved versions of documents | 0 | ⚠️ Partial |
+| UIB-65 | Ignore drafts, archived, and superseded versions | 0 | ❌ Pending |
+| UIB-75 | Aggregate multiple relevant documents | 0 | ⚠️ Partial |
+| UIB-79 | Consolidate insights into one clear answer | 0 | ⚠️ Partial |
+| UIB-83 | Cite multiple sources where applicable | 0 | ⚠️ Partial |
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden

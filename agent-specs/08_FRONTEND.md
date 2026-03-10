@@ -1320,3 +1320,19 @@ npm run dev
 - [ ] Sidebar shows dynamic "Try asking..." questions based on user's accessible documents
 - [ ] Clicking a suggested question sends it to the chat
 - [ ] `fetchMyDocuments` in api.js calls `GET /documents/my` and returns filtered document list
+
+## Jira Mapping
+
+**Covers:** UC-01, UC-15
+
+| Story ID | Title | AC | Implementation Status |
+|----------|-------|----|-----------------------|
+| UIB-1 | Access chatbot widget from approved internal systems | 0 | ✅ Implemented |
+| UIB-14 | Start chatbot interaction on user trigger | 0 | ✅ Implemented |
+| UIB-179 | Allow users to rate chatbot responses | 0 | ✅ Implemented |
+| UIB-183 | Capture optional free-text feedback | 0 | ✅ Implemented |
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden

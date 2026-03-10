@@ -598,3 +598,29 @@ async def clear_chat_endpoint(
 - [ ] Asking the same question twice in the same session uses conversation memory
 - [ ] Server logs show "Thought:", "Action:", "Observation:" in verbose output
 - [ ] `reasoning_steps` value matches the number of Thought/Action/Observe cycles in logs
+
+## Jira Mapping
+
+**Covers:** UC-05, UC-06, UC-07, UC-08, UC-09, UC-10, UC-13
+
+| Story ID | Title | AC | Implementation Status |
+|----------|-------|----|-----------------------|
+| UIB-79 | Consolidate insights into one clear answer | 0 | ⚠️ Partial |
+| UIB-88 | Help users when many documents are relevant | 0 | ❌ Pending |
+| UIB-93 | Maintain context within an active session | 0 | ✅ Implemented |
+| UIB-98 | Allow user to clear or reset context within a session | 0 | ✅ Implemented |
+| UIB-103 | Clear context when session expires or user logs out | 0 | ✅ Implemented |
+| UIB-109 | Start fresh context on new session start | 0 | ✅ Implemented |
+| UIB-113 | Detect ambiguous or overly broad queries | 0 | ✅ Implemented |
+| UIB-117 | Ask user for clarification before answering | 0 | ✅ Implemented |
+| UIB-123 | Detect when no matching or authorized content exists | 0 | ✅ Implemented |
+| UIB-126 | Return safe fallback instead of speculative answer | 0 | ✅ Implemented |
+| UIB-131 | Detect and log unanswered queries with metadata | 0 | ✅ Implemented |
+| UIB-135 | Route unanswered queries to designated university teams | 0 | ✅ Implemented |
+| UIB-157 | Detect irrelevant or out-of-scope queries | 0 | ✅ Implemented |
+| UIB-161 | Provide polite decline and scope guidance | 0 | ✅ Implemented |
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden

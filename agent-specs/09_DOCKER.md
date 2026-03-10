@@ -389,3 +389,14 @@ cd /Users/soumya.shrivastava/AgenticallyBuiltChatBot
 - [ ] `./docker/deploy.sh rebuild` rebuilds and restarts successfully
 - [ ] Docker volumes `hm_pdf_data`, `hm_vector_index`, `hm_sqlite_data` exist (`docker volume ls`)
 - [ ] Data persists after `./docker/deploy.sh stop` and `./docker/deploy.sh local`
+
+## Jira Mapping
+
+**Covers:** Infrastructure
+
+*No direct Jira story mapping — infrastructure/meta spec.*
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden

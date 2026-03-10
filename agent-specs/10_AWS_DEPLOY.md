@@ -348,3 +348,14 @@ echo "Next: run ./docker/deploy.sh aws from your local machine."
 - [ ] `http://<EC2_HOST>` loads the login screen
 - [ ] Login and chat work from the EC2 URL
 - [ ] `docker volume ls` on EC2 shows the 3 named volumes
+
+## Jira Mapping
+
+**Covers:** Infrastructure
+
+*No direct Jira story mapping — infrastructure/meta spec.*
+
+### Source of Truth Rules
+- Jira AC = WHAT (behavior) — wins on conflicts
+- This .md = HOW (implementation) — wins on design decisions
+- Conflicts must be flagged in docs/CONFLICTS.md, never silently overridden
