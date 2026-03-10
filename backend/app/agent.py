@@ -12,6 +12,7 @@ from app.config import settings
 from app.models import Role, SourceDoc
 from app.tools import make_search_tools
 from app.escalation_store import save_escalation
+from app.document_store import get_allowed_roles_map
 
 log = logging.getLogger(__name__)
 
@@ -255,6 +256,38 @@ def _extract_sources(intermediate_steps: list[Any]) -> list[SourceDoc]:
     return sources
 
 
+# ── Post-generation RBAC filter on citations ─────────────────
+
+def _filter_sources_by_role(
+    sources: list[SourceDoc],
+    user_role: str,
+) -> list[SourceDoc]:
+    """
+    Remove any cited source the user's role cannot access.
+    Checks each SourceDoc.source (filename) against allowed_roles
+    stored in DynamoDB document metadata.
+    Returns only sources the user is authorized to see.
+    """
+    if not sources:
+        return sources
+    try:
+        roles_map = get_allowed_roles_map()  # {filename: [roles]}
+    except Exception as exc:
+        log.warning("RBAC citation filter: cannot load roles map (%s); "
+                    "returning empty sources for safety.", exc)
+        return []
+
+    allowed: list[SourceDoc] = []
+    for src in sources:
+        doc_roles = roles_map.get(src.source, [])
+        if user_role in doc_roles:
+            allowed.append(src)
+        else:
+            log.info("RBAC citation filter: stripped '%s' (role=%s not in %s)",
+                     src.source, user_role, doc_roles)
+    return allowed
+
+
 # ── Direct FAISS fallback ────────────────────────────────────
 
 async def _direct_faiss_search(
@@ -325,9 +358,10 @@ async def _direct_faiss_search(
         log.error("LLM synthesis in fallback failed: %s", exc)
         answer = "I found relevant documents but could not generate a summary. Please try again."
 
+    safe_sources = _filter_sources_by_role(sources, role.value)
     return {
         "answer": answer,
-        "sources": [s.dict() for s in sources],
+        "sources": [s.dict() for s in safe_sources],
         "reasoning_steps": 1,
         "fallback_used": True,
         "error_type": None,
@@ -403,23 +437,26 @@ async def chat(
 
             # Clean response — return immediately
             if not _is_fallback_response(answer):
+                safe_sources = _filter_sources_by_role(sources, role.value)
                 return {
                     "answer":          answer,
                     "session_id":      session_id,
                     "role":            role.value,
-                    "sources":         [s.dict() for s in sources],
+                    "sources":         [s.dict() for s in safe_sources],
                     "reasoning_steps": len(intermediate),
                     "fallback_used":   False,
                     "error_type":      None,
                 }
 
             # Fallback phrase but FAISS actually ran — genuine not-found
+            # Return empty sources: neutral messages must not leak doc names
+            # (UIB-44, UIB-52)
             if _has_sources(intermediate):
                 return {
                     "answer":          answer,
                     "session_id":      session_id,
                     "role":            role.value,
-                    "sources":         [s.dict() for s in sources],
+                    "sources":         [],
                     "reasoning_steps": len(intermediate),
                     "fallback_used":   False,
                     "error_type":      None,

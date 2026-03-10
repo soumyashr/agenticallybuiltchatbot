@@ -694,3 +694,42 @@ Logged in `docs/CONFLICTS.md`.
 ### Tests
 5 tests in `TestFormGuidanceUC11` class (`backend/tests/test_agent_logic.py`),
 tagged `# AC: UIB-143-AC1,2,3,5,6`. Plus 1 shared prompt verification test.
+
+---
+
+## RBAC Citation Filter Fix
+
+**Date:** 2026-03-10
+**Resolves:** UIB-31, UIB-35, UIB-40, UIB-44, UIB-52
+**Root Cause:** `_extract_sources()` returned all sources with zero role validation,
+leaking restricted document names to unauthorized users even when answer content
+was correctly access-controlled.
+
+### What Changed
+
+1. **New function `_filter_sources_by_role()`** (`agent.py`):
+   - Checks each `SourceDoc.source` (filename) against `allowed_roles` from DynamoDB
+   - Uses `document_store.get_allowed_roles_map()` to resolve `{filename: [roles]}`
+   - Returns only sources the user's role is authorized to see
+   - On roles-map load failure → returns `[]` (fail-safe)
+
+2. **`chat()` — clean response path**:
+   - `_filter_sources_by_role()` called after `_extract_sources()`, before response return
+   - Only authorized citations reach the user
+
+3. **`chat()` — neutral/fallback response path**:
+   - When `_is_fallback_response()` is True and `_has_sources()` is True (genuine not-found):
+     sources are now `[]` instead of the raw extracted list
+   - Neutral messages must never leak document names (UIB-44, UIB-52)
+
+4. **`_direct_faiss_search()` fallback**:
+   - `_filter_sources_by_role()` applied before returning sources (defense-in-depth)
+
+### Tests
+6 tests in `TestRBACCitationFilter` class (`backend/tests/test_agent_logic.py`):
+- `test_citations_filtered_by_role_student` (UIB-31)
+- `test_no_restricted_docs_in_student_citations` (UIB-35)
+- `test_neutral_response_has_empty_sources` (UIB-44)
+- `test_fallback_response_has_empty_sources` (UIB-40)
+- `test_admin_citations_include_admin_docs` (UIB-52)
+- `test_authorized_user_still_gets_citations` (regression guard)

@@ -24,6 +24,7 @@ from app.agent import (
     _is_fallback_response,
     _has_sources,
     _extract_sources,
+    _filter_sources_by_role,
     _direct_faiss_search,
     chat as agent_chat,
     get_or_create_session,
@@ -953,3 +954,166 @@ class TestFormGuidanceUC11:
         assert "UIB-143" in prompt
         assert "never guess" in prompt.lower() or "never fabricate" in prompt.lower()
         assert "role-based access" in prompt.lower() or "role" in prompt.lower()
+
+
+# ═══════════════════════════════════════════════════════════════
+# 7. RBAC Citation Filter (UIB-31, UIB-35, UIB-40, UIB-44, UIB-52)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestRBACCitationFilter:
+    """
+    Tests for post-generation RBAC filter on source citations.
+    Ensures restricted document names never leak to unauthorized users.
+    """
+
+    # Roles map: simulates what get_allowed_roles_map() returns from DynamoDB
+    MOCK_ROLES_MAP = {
+        "student_handbook.pdf": ["admin", "faculty", "student"],
+        "faculty_manual.pdf": ["admin", "faculty"],
+        "admin_protocol.pdf": ["admin"],
+        "shared_policies.pdf": ["admin", "faculty", "student"],
+    }
+
+    @pytest.fixture(autouse=True)
+    def cleanup_sessions(self):
+        _sessions.clear()
+        yield
+        _sessions.clear()
+
+    # ── Unit tests for _filter_sources_by_role ──
+
+    # AC: UIB-31 — authorized sources only returned
+    @patch("app.agent.get_allowed_roles_map")
+    def test_citations_filtered_by_role_student(self, mock_roles):
+        """Student sees only student-accessible docs in citations."""
+        mock_roles.return_value = self.MOCK_ROLES_MAP
+
+        sources = [
+            SourceDoc(source="student_handbook.pdf", page=1, snippet="..."),
+            SourceDoc(source="faculty_manual.pdf", page=5, snippet="..."),
+            SourceDoc(source="admin_protocol.pdf", page=10, snippet="..."),
+        ]
+
+        filtered = _filter_sources_by_role(sources, "student")
+        names = {s.source for s in filtered}
+        assert names == {"student_handbook.pdf"}
+
+    # AC: UIB-35 — no restricted doc names in citations
+    @patch("app.agent.get_allowed_roles_map")
+    def test_no_restricted_docs_in_student_citations(self, mock_roles):
+        """Admin-only doc name must NOT appear in student response sources."""
+        mock_roles.return_value = self.MOCK_ROLES_MAP
+
+        sources = [
+            SourceDoc(source="student_handbook.pdf", page=1, snippet="..."),
+            SourceDoc(source="admin_protocol.pdf", page=3, snippet="Secret admin info"),
+        ]
+
+        filtered = _filter_sources_by_role(sources, "student")
+        for s in filtered:
+            assert s.source != "admin_protocol.pdf"
+
+    # AC: UIB-44 — neutral message has empty sources
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    @patch("app.agent.get_allowed_roles_map")
+    def test_neutral_response_has_empty_sources(self, mock_roles, mock_tools, mock_llm):
+        """When agent returns neutral/no-match with sources, response sources = []."""
+        mock_llm.return_value = MagicMock()
+        mock_tools.return_value = [MagicMock(name="semantic_search")]
+        mock_roles.return_value = self.MOCK_ROLES_MAP
+
+        def fake_invoke(inputs):
+            return {
+                "output": "I could not find information on this topic in the documents accessible to you.",
+                "intermediate_steps": [
+                    _make_step("[1] Source: admin_protocol.pdf, Page: 1\nRestricted content")
+                ],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("What is the admin budget?", "rbac-filter-neutral", Role.student)
+            )
+
+        assert "could not find" in result["answer"].lower()
+        assert result["sources"] == [], f"Sources should be empty on neutral response, got: {result['sources']}"
+
+    # AC: UIB-40 — fallback response has empty sources
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    @patch("app.agent._direct_faiss_search", new_callable=AsyncMock)
+    def test_fallback_response_has_empty_sources(self, mock_fallback, mock_tools, mock_llm):
+        """Fallback/error response never leaks source names."""
+        mock_llm.return_value = MagicMock()
+        mock_tools.return_value = [MagicMock(name="semantic_search")]
+        mock_fallback.return_value = {
+            "answer": "I could not find information on this topic.",
+            "sources": [],
+            "reasoning_steps": 0,
+            "fallback_used": True,
+            "error_type": "no_match",
+        }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = MagicMock(side_effect=TimeoutError("LLM timeout"))
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("test query", "rbac-filter-fallback", Role.student)
+            )
+
+        assert result["sources"] == []
+
+    # AC: UIB-52 — admin sees all accessible sources
+    @patch("app.agent.get_allowed_roles_map")
+    def test_admin_citations_include_admin_docs(self, mock_roles):
+        """Admin query → admin-only doc names ARE visible in sources."""
+        mock_roles.return_value = self.MOCK_ROLES_MAP
+
+        sources = [
+            SourceDoc(source="student_handbook.pdf", page=1, snippet="..."),
+            SourceDoc(source="faculty_manual.pdf", page=5, snippet="..."),
+            SourceDoc(source="admin_protocol.pdf", page=10, snippet="..."),
+        ]
+
+        filtered = _filter_sources_by_role(sources, "admin")
+        names = {s.source for s in filtered}
+        assert names == {"student_handbook.pdf", "faculty_manual.pdf", "admin_protocol.pdf"}
+
+    # Regression guard
+    @patch("app.agent._build_llm")
+    @patch("app.agent.make_search_tools")
+    @patch("app.agent.get_allowed_roles_map")
+    def test_authorized_user_still_gets_citations(self, mock_roles, mock_tools, mock_llm):
+        """Fix must not strip ALL citations — authorized ones must remain."""
+        mock_llm.return_value = MagicMock()
+        mock_tools.return_value = [MagicMock(name="semantic_search")]
+        mock_roles.return_value = self.MOCK_ROLES_MAP
+
+        def fake_invoke(inputs):
+            return {
+                "output": "The student handbook covers enrollment procedures. Source: student_handbook.pdf, Page: 12",
+                "intermediate_steps": [
+                    _make_step("[1] Source: student_handbook.pdf, Page: 12\nEnrollment procedures...")
+                ],
+            }
+
+        with patch("app.agent._create_executor") as mock_create:
+            executor = MagicMock()
+            executor.invoke = fake_invoke
+            mock_create.return_value = executor
+
+            result = asyncio.get_event_loop().run_until_complete(
+                agent_chat("How do I enroll?", "rbac-filter-auth", Role.student)
+            )
+
+        assert result["fallback_used"] is False
+        assert len(result["sources"]) == 1
+        assert result["sources"][0]["source"] == "student_handbook.pdf"
