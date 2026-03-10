@@ -7,6 +7,7 @@ All OpenAI / FAISS calls are mocked — no real API calls are made.
 from __future__ import annotations
 
 import json
+import time
 import asyncio
 import sqlite3
 from datetime import datetime, timedelta
@@ -25,6 +26,8 @@ from app.agent import (
     _has_sources,
     _extract_sources,
     _filter_sources_by_role,
+    _is_session_expired,
+    _cleanup_expired_sessions,
     _direct_faiss_search,
     chat as agent_chat,
     get_or_create_session,
@@ -1117,3 +1120,121 @@ class TestRBACCitationFilter:
         assert result["fallback_used"] is False
         assert len(result["sources"]) == 1
         assert result["sources"][0]["source"] == "student_handbook.pdf"
+
+
+# ═══════════════════════════════════════════════════════════════
+# 8. Session TTL + Memory Cleanup (UIB-93, UC-07)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestSessionTTLUC07:
+    """
+    Tests for session memory TTL and automatic cleanup.
+    Ensures conversation memory expires with JWT and does not
+    leak across sessions or accumulate indefinitely.
+    """
+
+    @pytest.fixture(autouse=True)
+    def cleanup_sessions(self):
+        _sessions.clear()
+        yield
+        _sessions.clear()
+
+    # AC: UIB-93-TTL1 — expired session memory cleared
+    @patch("app.agent._create_executor")
+    def test_expired_session_memory_cleared(self, mock_create):
+        """Expired session is evicted; next access creates a fresh executor."""
+        mock_create.return_value = MagicMock()
+
+        # Create a session manually with a past timestamp
+        _sessions["ttl-test-1"] = {
+            "executor": MagicMock(),
+            "role": Role.student,
+            "created_at": time.time() - 99999,  # well past any TTL
+        }
+
+        # Accessing should evict the expired session and create a new one
+        executor = get_or_create_session("ttl-test-1", Role.student)
+        mock_create.assert_called_once()  # new executor created
+        assert _sessions["ttl-test-1"]["created_at"] > time.time() - 5
+
+    # AC: UIB-93-TTL2 — valid session memory preserved
+    @patch("app.agent._create_executor")
+    def test_valid_session_memory_preserved(self, mock_create):
+        """Session within TTL keeps its existing executor."""
+        original_executor = MagicMock()
+        mock_create.return_value = original_executor
+
+        _sessions["ttl-test-2"] = {
+            "executor": original_executor,
+            "role": Role.student,
+            "created_at": time.time(),  # just created — well within TTL
+        }
+
+        executor = get_or_create_session("ttl-test-2", Role.student)
+        mock_create.assert_not_called()  # no new executor
+        assert executor is original_executor
+
+    # AC: UIB-93-TTL3 — memory cleared on explicit clear_session
+    @patch("app.agent._create_executor")
+    def test_memory_cleared_on_explicit_clear(self, mock_create):
+        """clear_session() removes the session entirely."""
+        mock_create.return_value = MagicMock()
+
+        _sessions["ttl-test-3"] = {
+            "executor": MagicMock(),
+            "role": Role.student,
+            "created_at": time.time(),
+        }
+        assert "ttl-test-3" in _sessions
+
+        clear_session("ttl-test-3")
+        assert "ttl-test-3" not in _sessions
+
+    # AC: UIB-93-TTL4 — TTL configurable via settings
+    def test_session_ttl_configurable(self):
+        """session_memory_ttl_seconds setting exists and is reasonable."""
+        assert hasattr(settings, "session_memory_ttl_seconds")
+        assert settings.session_memory_ttl_seconds > 0
+        # Default should match JWT expiry (8 hours = 28800 seconds)
+        assert settings.session_memory_ttl_seconds == 28800
+
+    # AC: UIB-93-TTL5 — no memory leak across sessions
+    @patch("app.agent._create_executor")
+    def test_no_memory_leak_across_sessions(self, mock_create):
+        """Two different users with different session IDs have isolated memory."""
+        mock_create.return_value = MagicMock()
+
+        get_or_create_session("user-A-session", Role.student)
+        get_or_create_session("user-B-session", Role.faculty)
+
+        assert "user-A-session" in _sessions
+        assert "user-B-session" in _sessions
+        assert _sessions["user-A-session"]["role"] != _sessions["user-B-session"]["role"]
+
+        # Clearing one does not affect the other
+        clear_session("user-A-session")
+        assert "user-A-session" not in _sessions
+        assert "user-B-session" in _sessions
+
+    # AC: UIB-93-TTL6 — fresh session gets no prior context after expiry
+    @patch("app.agent._create_executor")
+    def test_new_session_has_no_prior_context(self, mock_create):
+        """After expiry, a new executor is created — no stale memory."""
+        first_executor = MagicMock(name="old_executor")
+        second_executor = MagicMock(name="new_executor")
+        # Only the recreation call happens; return the new executor
+        mock_create.return_value = second_executor
+
+        # Create session manually with expired timestamp
+        _sessions["ttl-test-6"] = {
+            "executor": first_executor,
+            "role": Role.student,
+            "created_at": time.time() - 99999,
+        }
+
+        # Access triggers expiry + recreation
+        executor = get_or_create_session("ttl-test-6", Role.student)
+        mock_create.assert_called_once()  # recreated
+        assert executor is second_executor
+        assert executor is not first_executor

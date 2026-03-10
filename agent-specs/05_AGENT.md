@@ -733,3 +733,39 @@ was correctly access-controlled.
 - `test_fallback_response_has_empty_sources` (UIB-40)
 - `test_admin_citations_include_admin_docs` (UIB-52)
 - `test_authorized_user_still_gets_citations` (regression guard)
+
+---
+
+## Session TTL Fix
+
+**Date:** 2026-03-11
+**Resolves:** M4, M5 (VALIDATION_GAP_ANALYSIS.md), UIB-93 points 4-7
+**Root Cause:** Conversation memory stored in `_sessions` dict had no TTL,
+persisting beyond JWT expiry and accumulating indefinitely.
+
+### What Changed
+
+1. **`session_memory_ttl_seconds` setting** (`config.py`):
+   - Default: 28800 (8 hours, matching JWT expiry)
+   - Overridable via `SESSION_MEMORY_TTL_SECONDS` env var
+
+2. **`_is_session_expired()`** (`agent.py`):
+   - Checks `created_at` timestamp against TTL
+
+3. **`_cleanup_expired_sessions()`** (`agent.py`):
+   - Called lazily on every `get_or_create_session()` access
+   - Removes all sessions that have exceeded TTL
+
+4. **`get_or_create_session()`** updated:
+   - Calls `_cleanup_expired_sessions()` at the start of every access
+   - Expired sessions are evicted and recreated with fresh memory
+   - `created_at` timestamp stored in session dict
+
+### Tests
+6 tests in `TestSessionTTLUC07` class (`backend/tests/test_agent_logic.py`):
+- `test_expired_session_memory_cleared` (TTL1)
+- `test_valid_session_memory_preserved` (TTL2)
+- `test_memory_cleared_on_explicit_clear` (TTL3)
+- `test_session_ttl_configurable` (TTL4)
+- `test_no_memory_leak_across_sessions` (TTL5)
+- `test_new_session_has_no_prior_context` (TTL6)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 import logging
 from typing import Any
 
@@ -73,8 +74,25 @@ def _has_sources(intermediate_steps: list[Any]) -> bool:
 
 
 # ── In-memory session store ───────────────────────────────────
-# { session_id: { "executor": AgentExecutor, "role": Role } }
+# { session_id: { "executor": AgentExecutor, "role": Role, "created_at": float } }
 _sessions: dict[str, dict] = {}
+
+
+def _is_session_expired(session: dict) -> bool:
+    """Return True if the session has exceeded its TTL."""
+    created = session.get("created_at", 0)
+    return (time.time() - created) > settings.session_memory_ttl_seconds
+
+
+def _cleanup_expired_sessions() -> None:
+    """Remove all expired sessions. Called lazily on session access."""
+    expired = [
+        sid for sid, sess in _sessions.items()
+        if _is_session_expired(sess)
+    ]
+    for sid in expired:
+        del _sessions[sid]
+        log.info("Session expired and cleared: %s", sid)
 
 
 # ── LLM factory (lazy imports) ───────────────────────────────
@@ -201,7 +219,11 @@ def get_or_create_session(session_id: str, role: Role) -> AgentExecutor:
     Return existing session executor or create a new one.
     Reusing a session_id with a different role raises PermissionError
     to prevent privilege escalation.
+    Expired sessions are automatically cleared and recreated.
     """
+    # Lazy cleanup: purge all expired sessions on every access
+    _cleanup_expired_sessions()
+
     if session_id in _sessions:
         cached = _sessions[session_id]
         if cached["role"] != role:
@@ -212,7 +234,11 @@ def get_or_create_session(session_id: str, role: Role) -> AgentExecutor:
         return cached["executor"]
 
     executor = _create_executor(role)
-    _sessions[session_id] = {"executor": executor, "role": role}
+    _sessions[session_id] = {
+        "executor": executor,
+        "role": role,
+        "created_at": time.time(),
+    }
     log.info(f"New session created: id={session_id} role={role.value}")
     return executor
 

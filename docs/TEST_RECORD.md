@@ -9,8 +9,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 156 |
-| Pass | 156 |
+| Total tests | 162 |
+| Pass | 162 |
 | Fail | 0 |
 | Test files | 9 |
 | Python | 3.11.9 |
@@ -20,14 +20,14 @@ Both provider configurations tested:
 
 | Provider | Tests | Passed | Failed |
 |----------|-------|--------|--------|
-| AI_PROVIDER=openai | 156 | 156 | 0 |
-| AI_PROVIDER=azure_openai | 156 | 156 | 0 |
+| AI_PROVIDER=openai | 162 | 162 | 0 |
+| AI_PROVIDER=azure_openai | 162 | 162 | 0 |
 
 ---
 
 ## Test Files
 
-### 1. test_agent_logic.py (61 tests)
+### 1. test_agent_logic.py (67 tests)
 
 Covers: agent retry logic, RBAC filtering, document ingest, chat endpoint,
 GET /documents/my sidebar endpoint.
@@ -52,6 +52,7 @@ AC tags used: `# AC: UIB-140-AC1` through `# AC: UIB-140-AC6`,
 `# AC: UIB-143-AC5`, `# AC: UIB-143-AC6`.
 
 | TestRBACCitationFilter | 6 | RBAC citation filter: UIB-31 (role filtering), UIB-35 (no restricted docs), UIB-44 (neutral=empty sources), UIB-40 (fallback=empty), UIB-52 (admin sees all), regression guard |
+| TestSessionTTLUC07 | 6 | Session TTL: expired eviction, valid preservation, explicit clear, TTL configurable, no cross-session leak, fresh context after expiry |
 
 AI_PROVIDER coverage: provider-agnostic (mocks LLM/tools at function level).
 
@@ -271,4 +272,4 @@ cd backend && python3 -m pytest tests/test_document_store.py -v
 
 ## Known Issues
 
-None. All 156 tests pass for both AI_PROVIDER values.
+None. All 162 tests pass for both AI_PROVIDER values.

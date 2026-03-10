@@ -98,6 +98,7 @@ class Settings(BaseSettings):
     chunk_overlap: int = 200
     retriever_top_k: int = 5
     max_history_turns: int = 10
+    session_memory_ttl_seconds: int = 28800  # 8 hours, matches JWT expiry
 
     class Config:
         env_file = ".env"
