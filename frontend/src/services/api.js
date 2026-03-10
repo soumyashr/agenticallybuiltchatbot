@@ -98,3 +98,20 @@ export async function pollDocumentStatus(token, docId) {
   if (!res.ok) throw new Error('Status poll failed');
   return res.json();
 }
+
+// ── Feedback ─────────────────────────────────────────────────
+export async function submitFeedback(token, { sessionId, message, responsePreview, rating, comment }) {
+  const res = await fetch(`${API_BASE}/feedback`, {
+    method:  'POST',
+    headers: authHeaders(token),
+    body:    JSON.stringify({
+      session_id: sessionId,
+      message,
+      response_preview: responsePreview,
+      rating,
+      comment: comment || '',
+    }),
+  });
+  if (!res.ok) throw new Error('Feedback submission failed');
+  return res.json();
+}

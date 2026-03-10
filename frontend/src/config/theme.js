@@ -4,6 +4,7 @@ export const THEME = {
   greenHover:    '#2E9640',
   greenLight:    '#E8F8EA',
   greenDim:      '#E8F8EA',
+  teal:          '#009797',
 
   // ── Light Surfaces ───────────────────────────
   bgDeep:        '#FFFFFF',   // page background

@@ -52,6 +52,16 @@ class Settings(BaseSettings):
     # DynamoDB
     dynamo_table: str = "hm-documents"
     dynamo_region: str = "ap-south-1"
+    feedback_table: str = "hm-feedback"
+    escalation_table: str = "hm-escalations"
+
+    # UC-08/UC-13 prompt overrides (env vars: CLARIFY_PROMPT, IRRELEVANT_QUERY_MSG)
+    clarify_ambiguous_prompt: str = ""
+    irrelevant_query_response: str = ""
+
+    # UC-10 Escalation
+    slack_webhook_url: str = ""
+    escalation_enabled: bool = True
 
     # Data
     data_dir: str = "data"

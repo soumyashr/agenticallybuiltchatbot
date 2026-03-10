@@ -23,6 +23,7 @@ from langchain_core.prompts import PromptTemplate
 from app.config import settings
 from app.models import Role, SourceDoc
 from app.tools import make_search_tools
+from app.escalation_store import save_escalation
 
 log = logging.getLogger(__name__)
 
@@ -146,6 +147,14 @@ RULES:
 - Never answer from your own training knowledge — only from search results
 - NEVER repeat the same search query — if you already searched, write your Final Answer NOW
 
+CLARIFICATION (UC-08):
+- If a user's query is unclear, too broad, or could mean multiple things, ask ONE specific clarifying question before attempting to answer. Do not guess or provide a partial answer. Examples of unclear queries: "tell me everything", "what are the rules", "how does it work".
+{clarify_prompt}
+
+IRRELEVANT QUERIES (UC-13):
+- If a user's query is completely unrelated to institutional documents, academic policies, curriculum, faculty matters, or organizational information, politely decline with: "Final Answer: I can only assist with questions related to institutional documents and organizational information. For other topics, please use the appropriate resource." Do not attempt to answer off-topic queries such as weather, sports, cooking, or general knowledge.
+{irrelevant_query_msg}
+
 Previous conversation:
 {chat_history}
 
@@ -162,6 +171,8 @@ def _build_prompt() -> PromptTemplate:
         partial_variables={
             "system_prompt":  settings.agent_system_prompt,
             "max_iterations": str(settings.agent_max_iterations),
+            "clarify_prompt": settings.clarify_ambiguous_prompt,
+            "irrelevant_query_msg": settings.irrelevant_query_response,
         },
         template=REACT_TEMPLATE,
     )
@@ -335,6 +346,40 @@ async def _direct_faiss_search(
     }
 
 
+# ── UC-10 Escalation helpers ─────────────────────────────────
+
+async def _notify_slack(role: str, message: str) -> None:
+    """Send Slack webhook notification. Swallows all exceptions."""
+    url = settings.slack_webhook_url
+    if not url:
+        return
+    try:
+        import httpx
+        from datetime import datetime
+        payload = {
+            "text": (
+                f":warning: *Unanswered Query Escalation*\n"
+                f"*Role:* {role}\n"
+                f"*Query:* {message[:200]}\n"
+                f"*Time:* {datetime.utcnow().isoformat()}"
+            )
+        }
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(url, json=payload)
+    except Exception as exc:
+        log.warning("Slack notification failed (non-blocking): %s", exc)
+
+
+async def _escalate(session_id: str, message: str, role_value: str, reason: str) -> None:
+    """Save escalation and optionally notify Slack. Never raises."""
+    try:
+        if settings.escalation_enabled:
+            save_escalation(session_id, message, role_value, reason)
+            await _notify_slack(role_value, message)
+    except Exception as exc:
+        log.warning("Escalation save/notify failed (non-blocking): %s", exc)
+
+
 # ── Public chat interface ────────────────────────────────────
 
 async def chat(
@@ -397,6 +442,9 @@ async def chat(
                 "Agent parse failure (attempt %d/%d): %s",
                 attempt, MAX_AGENT_RETRIES, answer[:100],
             )
+            # UC-10: escalate on final parse-failure attempt
+            if attempt == MAX_AGENT_RETRIES:
+                await _escalate(session_id, message, role.value, "no_answer_found")
 
         except Exception as exc:
             exc_str = str(exc).lower()
@@ -413,6 +461,8 @@ async def chat(
 
     # All retries exhausted — fall back to direct FAISS search
     log.warning("All %d retries exhausted, using direct FAISS fallback.", MAX_AGENT_RETRIES)
+    # UC-10: escalate on exhausted retries
+    await _escalate(session_id, message, role.value, "agent_parse_failure")
     fallback_result = await _direct_faiss_search(message, role)
     fallback_result["session_id"] = session_id
     fallback_result["role"] = role.value
@@ -442,6 +492,22 @@ If all retries are exhausted, the system bypasses the ReAct agent entirely:
 All responses include two additional fields:
 - `fallback_used` (bool): True if the direct vector store fallback was used
 - `error_type` (str | null): `"retrieval_error"`, `"no_match"`, or null
+
+### UC-08 Clarification & UC-13 Irrelevant Query Handling
+The ReAct prompt now includes two additional sections:
+- **UC-08**: Instructs the agent to ask a clarifying question for ambiguous/broad queries
+- **UC-13**: Instructs the agent to decline off-topic queries (weather, sports, etc.)
+Both are configurable via `CLARIFY_PROMPT` and `IRRELEVANT_QUERY_MSG` env vars.
+
+### UC-10 Escalation
+When the agent cannot answer (parse failures or no relevant documents found):
+1. `save_escalation()` writes to DynamoDB table `hm-escalations`
+2. `_notify_slack()` sends a webhook notification (if `SLACK_WEBHOOK_URL` is set)
+3. Both are wrapped in `_escalate()` which never raises — failures are logged and swallowed
+
+Escalation triggers:
+- Final parse-failure attempt within retry loop → reason `"no_answer_found"`
+- All retries exhausted before FAISS fallback → reason `"agent_parse_failure"`
 
 ### max_iterations
 `_create_executor` uses `max(settings.agent_max_iterations, 7)` to ensure enough

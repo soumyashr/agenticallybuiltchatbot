@@ -13,7 +13,7 @@ import AdminPanel   from './components/admin/AdminPanel';
 
 function AppShell() {
   const { auth, loading, error, handleLogin, logout, isAdmin } = useAuth();
-  const { messages, loading: chatLoading, send, newChat, bottomRef } = useChat(auth?.token);
+  const { messages, loading: chatLoading, send, newChat, bottomRef, sessionId } = useChat(auth?.token);
   const [activeTab, setActiveTab] = useState('chat');
 
   function handleLogout() {
@@ -35,7 +35,7 @@ function AppShell() {
         <Header activeTab={activeTab} onTabChange={setActiveTab} isAdmin={isAdmin} />
         {activeTab === 'chat' ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <MessageList messages={messages} loading={chatLoading} bottomRef={bottomRef} auth={auth} />
+            <MessageList messages={messages} loading={chatLoading} bottomRef={bottomRef} auth={auth} sessionId={sessionId} token={auth.token} />
             <ChatInput onSend={send} disabled={chatLoading} />
           </div>
         ) : (

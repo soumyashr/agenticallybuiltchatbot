@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 
 class Role(str, Enum):
@@ -45,3 +45,16 @@ class DocumentStatusResponse(BaseModel):
     status: str
     chunk_count: int
     error_msg: Optional[str] = None
+
+
+class FeedbackRequest(BaseModel):
+    session_id: str
+    message: str
+    response_preview: str
+    rating: Literal["positive", "negative"]
+    comment: str = ""
+
+
+class FeedbackResponse(BaseModel):
+    id: str
+    status: str

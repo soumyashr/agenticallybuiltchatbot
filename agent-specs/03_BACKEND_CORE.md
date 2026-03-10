@@ -96,6 +96,16 @@ AGENT_SYSTEM_PROMPT=You are Happiest Minds Knowledge Hub, an AI assistant for Ha
 # ── DynamoDB ─────────────────────────────────
 DYNAMO_TABLE=hm-documents
 DYNAMO_REGION=ap-south-1
+FEEDBACK_TABLE=hm-feedback
+ESCALATION_TABLE=hm-escalations
+
+# ── UC-08/UC-13 Prompt Overrides ─────────────
+CLARIFY_PROMPT=
+IRRELEVANT_QUERY_MSG=
+
+# ── UC-10 Escalation ────────────────────────
+SLACK_WEBHOOK_URL=
+ESCALATION_ENABLED=true
 
 # ── Data ─────────────────────────────────────
 DATA_DIR=data
@@ -156,6 +166,16 @@ class Settings(BaseSettings):
     # DynamoDB
     dynamo_table: str = "hm-documents"
     dynamo_region: str = "ap-south-1"
+    feedback_table: str = "hm-feedback"
+    escalation_table: str = "hm-escalations"
+
+    # UC-08/UC-13 prompt overrides
+    clarify_ambiguous_prompt: str = ""
+    irrelevant_query_response: str = ""
+
+    # UC-10 Escalation
+    slack_webhook_url: str = ""
+    escalation_enabled: bool = True
 
     # Agent
     agent_max_iterations: int = 5
@@ -196,7 +216,7 @@ Write to `backend/app/models.py`:
 ```python
 from pydantic import BaseModel
 from enum import Enum
-from typing import Optional
+from typing import Optional, Literal
 
 
 class Role(str, Enum):
@@ -241,6 +261,19 @@ class DocumentStatusResponse(BaseModel):
     status: str
     chunk_count: int
     error_msg: Optional[str] = None
+
+
+class FeedbackRequest(BaseModel):
+    session_id: str
+    message: str
+    response_preview: str
+    rating: Literal["positive", "negative"]
+    comment: str = ""
+
+
+class FeedbackResponse(BaseModel):
+    id: str
+    status: str
 ```
 
 ---
@@ -437,7 +470,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import init_users_db
-from app.routers import auth_router, chat_router, documents_router
+from app.routers import auth_router, chat_router, documents_router, feedback_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -480,6 +513,10 @@ async def startup() -> None:
     from app.document_store import init_db
     init_db()
     log.info("DocumentStore: DynamoDB table '%s' in %s", settings.dynamo_table, settings.dynamo_region)
+    from app.feedback_store import init_feedback_table
+    from app.escalation_store import init_escalation_table
+    init_feedback_table()
+    init_escalation_table()
     log.info("Startup complete.")
 
 
@@ -487,6 +524,8 @@ app.include_router(auth_router.router,      prefix="/auth",  tags=["Auth"])
 app.include_router(chat_router.router,                       tags=["Chat"])
 app.include_router(documents_router.router,        prefix="/admin", tags=["Admin"])
 app.include_router(documents_router.public_router,                  tags=["Documents"])
+app.include_router(feedback_router.router,                          tags=["Feedback"])
+app.include_router(feedback_router.admin_router,   prefix="/admin", tags=["Admin"])
 
 
 @app.get("/health", tags=["Health"])

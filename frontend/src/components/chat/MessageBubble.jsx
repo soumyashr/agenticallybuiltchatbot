@@ -1,12 +1,39 @@
 import { useState } from 'react';
 import { THEME } from '../../config/theme';
+import { submitFeedback } from '../../services/api';
 
-export default function MessageBubble({ message, userInitial }) {
+export default function MessageBubble({ message, userInitial, sessionId, token }) {
   const [showSources, setShowSources] = useState(false);
+  const [feedbackState, setFeedbackState] = useState('idle'); // idle | selected | submitted
+  const [selectedRating, setSelectedRating] = useState(null);
+  const [comment, setComment] = useState('');
+  const [hovered, setHovered] = useState(null); // 'up' | 'down'
+
   const isUser      = message.role === 'user';
   const isError     = message.role === 'error';
+  const isAssistant = message.role === 'assistant';
   const hasSources  = message.sources?.length > 0;
   const hasSteps    = message.reasoningSteps > 0;
+
+  function handleRatingClick(rating) {
+    setSelectedRating(rating);
+    setFeedbackState('selected');
+  }
+
+  async function handleSubmit() {
+    try {
+      await submitFeedback(token, {
+        sessionId,
+        message: message.userQuery || '',
+        responsePreview: (message.content || '').slice(0, 200),
+        rating: selectedRating,
+        comment,
+      });
+      setFeedbackState('submitted');
+    } catch {
+      setFeedbackState('submitted');
+    }
+  }
 
   if (isUser) {
     return (
@@ -95,6 +122,74 @@ export default function MessageBubble({ message, userInitial }) {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Feedback row — assistant messages only */}
+        {isAssistant && feedbackState === 'idle' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+            <button
+              onClick={() => handleRatingClick('positive')}
+              onMouseEnter={() => setHovered('up')}
+              onMouseLeave={() => setHovered(null)}
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                fontSize: 14, padding: '2px 6px', borderRadius: 4,
+                color: hovered === 'up' ? THEME.teal : THEME.textMuted,
+                transition: 'color 0.15s',
+              }}
+              title="Helpful"
+            >👍</button>
+            <button
+              onClick={() => handleRatingClick('negative')}
+              onMouseEnter={() => setHovered('down')}
+              onMouseLeave={() => setHovered(null)}
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                fontSize: 14, padding: '2px 6px', borderRadius: 4,
+                color: hovered === 'down' ? '#e74c3c' : THEME.textMuted,
+                transition: 'color 0.15s',
+              }}
+              title="Not helpful"
+            >👎</button>
+          </div>
+        )}
+
+        {isAssistant && feedbackState === 'selected' && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginTop: 6,
+            flexWrap: 'wrap',
+          }}>
+            <span style={{ fontSize: 12, color: THEME.textMuted }}>
+              {selectedRating === 'positive' ? '👍' : '👎'}
+            </span>
+            <input
+              type="text"
+              value={comment}
+              onChange={e => setComment(e.target.value)}
+              placeholder="Comment (optional)"
+              style={{
+                fontSize: 12, padding: '4px 8px', borderRadius: 6,
+                border: `1px solid ${THEME.bgBorder}`, background: THEME.bgMid,
+                color: THEME.textLight, outline: 'none', flex: 1, minWidth: 120,
+                fontFamily: THEME.fontBase,
+              }}
+            />
+            <button
+              onClick={handleSubmit}
+              style={{
+                fontSize: 11, padding: '4px 12px', borderRadius: 6,
+                border: 'none', cursor: 'pointer',
+                background: THEME.teal, color: '#fff',
+                fontFamily: THEME.fontBase, fontWeight: 600,
+              }}
+            >Submit</button>
+          </div>
+        )}
+
+        {isAssistant && feedbackState === 'submitted' && (
+          <p style={{ fontSize: 11, color: THEME.teal, marginTop: 6 }}>
+            Thanks for your feedback!
+          </p>
         )}
       </div>
     </div>

@@ -42,7 +42,11 @@ AZURE_SEARCH_ADMIN_KEY=
 AZURE_SEARCH_INDEX=
 DYNAMO_TABLE=hm-documents
 DYNAMO_REGION=ap-south-1
+FEEDBACK_TABLE=hm-feedback
+ESCALATION_TABLE=hm-escalations
 JWT_SECRET=<production-secret>
+SLACK_WEBHOOK_URL=               ← optional, for UC-10 escalation notifications
+ESCALATION_ENABLED=true
 DATA_DIR=data
 VECTOR_STORE_DIR=vector_store
 ```
@@ -50,7 +54,8 @@ VECTOR_STORE_DIR=vector_store
 ### IAM Role
 The App Runner service uses instance role `apprunner-hm-instance-role` with
 `AmazonDynamoDBFullAccess` policy attached. This allows the backend to
-read/write the `hm-documents` DynamoDB table without explicit AWS credentials.
+read/write the DynamoDB tables (`hm-documents`, `hm-feedback`, `hm-escalations`)
+without explicit AWS credentials.
 
 ### Frontend Build Arg
 The frontend Docker build must pass the backend URL as a build arg:

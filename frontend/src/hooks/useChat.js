@@ -39,6 +39,7 @@ export function useChat(token) {
         content:        data.answer,
         sources:        data.sources        || [],
         reasoningSteps: data.reasoning_steps ?? 0,
+        userQuery:      text,
       };
       setMessages(prev => [...prev, aiMsg]);
     } catch (err) {
@@ -59,5 +60,5 @@ export function useChat(token) {
     setSessionId(newSessionId());
   }, [token, sessionId]);
 
-  return { messages, loading, send, newChat, bottomRef };
+  return { messages, loading, send, newChat, bottomRef, sessionId };
 }

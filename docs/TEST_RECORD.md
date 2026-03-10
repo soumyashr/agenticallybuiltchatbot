@@ -9,10 +9,10 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 83 |
-| Pass | 83 |
+| Total tests | 105 |
+| Pass | 105 |
 | Fail | 0 |
-| Test files | 5 |
+| Test files | 7 |
 | Python | 3.11.9 |
 | Runner | pytest 9.0.2 |
 
@@ -20,8 +20,8 @@ Both provider configurations tested:
 
 | Provider | Tests | Passed | Failed |
 |----------|-------|--------|--------|
-| AI_PROVIDER=openai | 83 | 83 | 0 |
-| AI_PROVIDER=azure_openai | 83 | 83 | 0 |
+| AI_PROVIDER=openai | 105 | 105 | 0 |
+| AI_PROVIDER=azure_openai | 105 | 105 | 0 |
 
 ---
 
@@ -105,6 +105,31 @@ Validates correct LLM, embeddings, and vector store are instantiated.
 
 AI_PROVIDER coverage: explicitly tests both `openai` and `azure_openai` paths.
 
+### 6. test_feedback.py (12 tests)
+
+Covers: UC-15 feedback — DynamoDB store, POST /feedback, GET /admin/feedback.
+Uses `moto` library to mock AWS DynamoDB.
+
+| Class | Tests | Coverage |
+|-------|-------|----------|
+| TestFeedbackStore | 5 | save_returns_uuid, correct_fields, by_session, truncated, comment_default |
+| TestFeedbackEndpoint | 7 | positive, negative, requires_auth, invalid_rating_422, admin_view, student_403, comment_optional |
+
+AI_PROVIDER coverage: provider-independent (DynamoDB works regardless of AI_PROVIDER).
+
+### 7. test_escalation.py (10 tests)
+
+Covers: UC-10 escalation — DynamoDB store, agent escalation logic, Slack webhook, admin endpoint.
+Uses `moto` library to mock AWS DynamoDB, extensive mocking of agent internals.
+
+| Class | Tests | Coverage |
+|-------|-------|----------|
+| TestEscalationStore | 3 | save_uuid, correct_fields, mark_notified |
+| TestEscalationLogic | 5 | saved_on_no_answer, saved_on_parse_failure, slack_sent_when_configured, slack_failure_no_break, no_slack_when_no_webhook |
+| TestEscalationEndpoint | 2 | admin_view, student_403 |
+
+AI_PROVIDER coverage: provider-agnostic (mocks LLM/tools at function level).
+
 ---
 
 ## Key Tests for AI_PROVIDER Switching
@@ -149,6 +174,7 @@ the entire AI stack:
 - `moto[dynamodb]>=5.0.0` — DynamoDB mocking in tests
 - `azure-search-documents>=11.4.0` — Azure AI Search
 - `azure-identity>=1.15.0` — Azure authentication
+- `httpx` — Async HTTP client for Slack webhook notifications
 
 ---
 
@@ -198,4 +224,4 @@ cd backend && python3 -m pytest tests/test_document_store.py -v
 
 ## Known Issues
 
-None. All 83 tests pass for both AI_PROVIDER values.
+None. All 105 tests pass for both AI_PROVIDER values.

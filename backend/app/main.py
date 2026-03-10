@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import init_users_db
-from app.routers import auth_router, chat_router, documents_router
+from app.routers import auth_router, chat_router, documents_router, feedback_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,6 +41,12 @@ async def startup() -> None:
     from app.document_store import init_db
     init_db()
     log.info("DocumentStore: DynamoDB table '%s' in %s", settings.dynamo_table, settings.dynamo_region)
+    from app.feedback_store import init_feedback_table
+    init_feedback_table()
+    log.info("FeedbackStore: DynamoDB table '%s'", settings.feedback_table)
+    from app.escalation_store import init_escalation_table
+    init_escalation_table()
+    log.info("EscalationStore: DynamoDB table '%s'", settings.escalation_table)
     log.info("Startup complete.")
 
 
@@ -48,6 +54,8 @@ app.include_router(auth_router.router,      prefix="/auth",  tags=["Auth"])
 app.include_router(chat_router.router,                       tags=["Chat"])
 app.include_router(documents_router.router,        prefix="/admin", tags=["Admin"])
 app.include_router(documents_router.public_router,                  tags=["Documents"])
+app.include_router(feedback_router.router,                          tags=["Feedback"])
+app.include_router(feedback_router.admin_router,   prefix="/admin", tags=["Admin"])
 
 
 @app.get("/health", tags=["Health"])
