@@ -29,36 +29,40 @@ async def chat_endpoint(
     user: dict = Depends(get_current_user),
 ):
     """Send a message to the ReAct agent and receive a grounded answer."""
+    role = Role(user["role"])
+
+    # ── UC-14: guardrail block — separate from agent block ────────
     try:
-        role = Role(user["role"])
-
-        # UC-14: run guardrails before agent
+        llm = _build_llm()
+        await run_guardrails(req.message, llm)
+    except GuardrailViolation as gv:
+        log.warning("Guardrail blocked: layer=%s reason=%s session=%s",
+                    gv.layer, gv.reason, req.session_id)
         try:
-            llm = _build_llm()
-            await run_guardrails(req.message, llm)
-        except GuardrailViolation as gv:
-            log.warning("Guardrail blocked: layer=%s reason=%s session=%s",
-                        gv.layer, gv.reason, req.session_id)
-            try:
-                save_escalation(
-                    req.session_id,
-                    req.message[:200],
-                    user["role"],
-                    f"guardrail_{gv.layer}_blocked",
-                )
-            except Exception:
-                log.warning("Failed to log guardrail escalation (non-blocking)")
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "answer": "I'm unable to process this request. Please rephrase "
-                              "your question or contact support if you believe this "
-                              "is an error.",
-                    "session_id": req.session_id,
-                    "sources": [],
-                },
+            save_escalation(
+                req.session_id,
+                req.message[:200],
+                user["role"],
+                f"guardrail_{gv.layer}_blocked",
             )
+        except Exception:
+            log.warning("Failed to log guardrail escalation (non-blocking)")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "answer": "I'm unable to process this request. Please rephrase "
+                          "your question or contact support if you believe this "
+                          "is an error.",
+                "session_id": req.session_id,
+                "sources": [],
+            },
+        )
+    except Exception as exc:
+        # Fail open — guardrail infrastructure errors never block users
+        log.warning("Guardrail infrastructure error (fail open): %s", exc)
 
+    # ── Agent block — only reached if guardrail passed ────────────
+    try:
         result = await agent_chat(
             message=req.message,
             session_id=req.session_id,

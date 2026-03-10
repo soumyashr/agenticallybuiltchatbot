@@ -9,8 +9,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 127 |
-| Pass | 127 |
+| Total tests | 133 |
+| Pass | 133 |
 | Fail | 0 |
 | Test files | 8 |
 | Python | 3.11.9 |
@@ -20,8 +20,8 @@ Both provider configurations tested:
 
 | Provider | Tests | Passed | Failed |
 |----------|-------|--------|--------|
-| AI_PROVIDER=openai | 127 | 127 | 0 |
-| AI_PROVIDER=azure_openai | 127 | 127 | 0 |
+| AI_PROVIDER=openai | 133 | 133 | 0 |
+| AI_PROVIDER=azure_openai | 133 | 133 | 0 |
 
 ---
 
@@ -130,10 +130,10 @@ Uses `moto` library to mock AWS DynamoDB, extensive mocking of agent internals.
 
 AI_PROVIDER coverage: provider-agnostic (mocks LLM/tools at function level).
 
-### 8. test_guardrails.py (21 tests)
+### 8. test_guardrails.py (27 tests)
 
 Covers: UC-14 two-layer abuse & security guardrails — sync pattern checks,
-LLM classification (mocked), integration, config defaults.
+LLM classification (mocked), integration, config defaults, HTTP endpoint regression.
 
 | Class | Tests | Coverage |
 |-------|-------|----------|
@@ -141,6 +141,17 @@ LLM classification (mocked), integration, config defaults.
 | TestLayer2LLMCheck | 5 | UNSAFE blocks, SAFE passes, LLM error fail-open, unexpected response passes, layer2 disabled skips |
 | TestGuardrailIntegration | 2 | Layer 1 blocks before Layer 2, both layers pass |
 | TestGuardrailConfig | 2 | guardrail_max_length default, guardrail_layer2_enabled default |
+| TestGuardrailEndpointIntegration | 6 | HTTP 400 for injection/long/script/act-as, HTTP 200 for clean, escalation logging |
+
+NOTE: TestGuardrailEndpointIntegration (6 tests) added after production
+incident — guardrail layer1 fired in isolation but endpoint returned 200.
+Root cause: guardrail try/except was nested inside the outer agent try/except
+with no fail-open handler; `_build_llm()` inside the guardrail block could
+throw non-GuardrailViolation exceptions, bypassing the guardrail entirely and
+falling through to the agent. Fix: separated guardrail and agent into two
+independent try/except blocks with a generic `except Exception: pass` for
+fail-open on guardrail infrastructure errors. Lesson: always test guardrails
+at HTTP layer via TestClient, not only at module level.
 
 AI_PROVIDER coverage: provider-agnostic (mocks LLM at function level).
 
@@ -238,4 +249,4 @@ cd backend && python3 -m pytest tests/test_document_store.py -v
 
 ## Known Issues
 
-None. All 127 tests pass for both AI_PROVIDER values.
+None. All 133 tests pass for both AI_PROVIDER values.
