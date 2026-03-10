@@ -26,6 +26,7 @@ from app.agent import (
     _has_sources,
     _extract_sources,
     _filter_sources_by_role,
+    _enrich_sources,
     _is_session_expired,
     _cleanup_expired_sessions,
     _direct_faiss_search,
@@ -1238,3 +1239,82 @@ class TestSessionTTLUC07:
         mock_create.assert_called_once()  # recreated
         assert executor is second_executor
         assert executor is not first_executor
+
+
+# ── Citation Format Enrichment (M1, UIB-35) ──────────────────
+
+class TestCitationFormatUC02:
+    """UC-02 citation format: display_name, uploaded_at enrichment from DynamoDB."""
+
+    # AC: UIB-35-AC1 — citations include display_name
+    def test_enriched_source_has_display_name(self):
+        """_enrich_sources populates display_name from DynamoDB metadata."""
+        src = SourceDoc(source="policy_v2.pdf", page=3, snippet="Some text")
+        meta_map = {"policy_v2.pdf": {"display_name": "University Policy v2", "uploaded_at": "2026-03-01T10:00:00"}}
+        with patch("app.agent.get_document_metadata_map", return_value=meta_map):
+            result = _enrich_sources([src])
+        assert result[0].display_name == "University Policy v2"
+
+    # AC: UIB-35-AC2 — citations include uploaded_at
+    def test_enriched_source_has_uploaded_at(self):
+        """_enrich_sources populates uploaded_at from DynamoDB metadata."""
+        src = SourceDoc(source="policy_v2.pdf", page=3, snippet="Some text")
+        meta_map = {"policy_v2.pdf": {"display_name": "University Policy v2", "uploaded_at": "2026-03-01T10:00:00"}}
+        with patch("app.agent.get_document_metadata_map", return_value=meta_map):
+            result = _enrich_sources([src])
+        assert result[0].uploaded_at == "2026-03-01T10:00:00"
+
+    # AC: UIB-35-AC3 — unknown files get no enrichment (graceful)
+    def test_unknown_file_stays_raw(self):
+        """Files not in DynamoDB retain original source without enrichment."""
+        src = SourceDoc(source="unknown.pdf", page=1, snippet="x")
+        meta_map = {"policy_v2.pdf": {"display_name": "University Policy v2", "uploaded_at": "2026-03-01T10:00:00"}}
+        with patch("app.agent.get_document_metadata_map", return_value=meta_map):
+            result = _enrich_sources([src])
+        assert result[0].display_name is None
+        assert result[0].uploaded_at is None
+        assert result[0].source == "unknown.pdf"
+
+    # AC: UIB-35-AC4 — metadata lookup failure returns raw sources safely
+    def test_metadata_error_returns_raw_sources(self):
+        """If DynamoDB metadata fails, sources are returned without enrichment."""
+        src = SourceDoc(source="policy_v2.pdf", page=3, snippet="Some text")
+        with patch("app.agent.get_document_metadata_map", side_effect=Exception("DynamoDB down")):
+            result = _enrich_sources([src])
+        assert len(result) == 1
+        assert result[0].display_name is None
+        assert result[0].source == "policy_v2.pdf"
+
+    # AC: UIB-35-AC5 — _extract_sources calls enrichment
+    def test_extract_sources_enriches_results(self):
+        """_extract_sources enriches parsed sources with DynamoDB metadata."""
+        observation = "[1] Source: handbook.pdf, Page: 5\nAdmission details here"
+        steps = [(MagicMock(), observation)]
+        meta_map = {"handbook.pdf": {"display_name": "Student Handbook", "uploaded_at": "2026-02-15T08:00:00"}}
+        with patch("app.agent.get_document_metadata_map", return_value=meta_map):
+            sources = _extract_sources(steps)
+        assert len(sources) == 1
+        assert sources[0].source == "handbook.pdf"
+        assert sources[0].display_name == "Student Handbook"
+        assert sources[0].uploaded_at == "2026-02-15T08:00:00"
+        assert sources[0].page == 5
+
+    # AC: UIB-35-AC6 — empty sources stay empty
+    def test_empty_sources_no_enrichment_call(self):
+        """_enrich_sources on empty list returns empty without calling DynamoDB."""
+        with patch("app.agent.get_document_metadata_map") as mock_meta:
+            result = _enrich_sources([])
+        mock_meta.assert_not_called()
+        assert result == []
+
+    # AC: UIB-35-AC7 — SourceDoc model accepts new optional fields
+    def test_source_doc_new_fields_optional(self):
+        """SourceDoc display_name and uploaded_at are optional and default to None."""
+        src = SourceDoc(source="file.pdf", snippet="text")
+        assert src.display_name is None
+        assert src.uploaded_at is None
+        assert src.page is None
+        # With values
+        src2 = SourceDoc(source="f.pdf", snippet="t", display_name="My File", uploaded_at="2026-01-01")
+        assert src2.display_name == "My File"
+        assert src2.uploaded_at == "2026-01-01"

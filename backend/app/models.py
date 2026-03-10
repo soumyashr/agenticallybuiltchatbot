@@ -30,6 +30,8 @@ class SourceDoc(BaseModel):
     source: str
     page: Optional[int] = None
     snippet: str
+    display_name: Optional[str] = None
+    uploaded_at: Optional[str] = None
 
 
 class ChatResponse(BaseModel):

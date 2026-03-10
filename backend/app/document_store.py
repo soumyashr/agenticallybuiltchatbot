@@ -114,6 +114,18 @@ def get_allowed_roles_map() -> dict[str, list[str]]:
     }
 
 
+def get_document_metadata_map() -> dict[str, dict]:
+    """Returns { filename: {display_name, uploaded_at} } for all INGESTED documents."""
+    return {
+        d["filename"]: {
+            "display_name": d.get("display_name", ""),
+            "uploaded_at": d.get("uploaded_at", ""),
+        }
+        for d in get_all_documents()
+        if d["status"] == "INGESTED"
+    }
+
+
 def set_status_ingesting(doc_id: str) -> None:
     _update_status(doc_id, "INGESTING")
 

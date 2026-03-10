@@ -112,8 +112,13 @@ export default function MessageBubble({ message, userInitial, sessionId, token }
                 borderRadius: 6, borderLeft: `3px solid ${THEME.green}`,
               }}>
                 <p style={{ fontSize: 12, fontWeight: 600, color: THEME.green, marginBottom: 2 }}>
-                  📄 {src.source}{src.page != null ? ` · Page ${src.page}` : ''}
+                  📄 {src.display_name || src.source}{src.page != null ? ` · Page ${src.page}` : ''}
                 </p>
+                {src.uploaded_at && (
+                  <p style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 2 }}>
+                    Uploaded: {new Date(src.uploaded_at).toLocaleDateString()}
+                  </p>
+                )}
                 {src.snippet && (
                   <p style={{ fontSize: 11, color: THEME.textMuted, lineHeight: 1.5 }}>
                     {src.snippet}

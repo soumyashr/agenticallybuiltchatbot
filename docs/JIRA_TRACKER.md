@@ -21,7 +21,7 @@ Last Updated: 2026-03-10
 | UC-02 | UIB-22 | UIB-23 | Retrieve from approved knowledge sources only | 0 | 0 | ✅ Done |
 | UC-02 | UIB-22 | UIB-27 | Apply role/group-based permissions to filter results | 0 | 0 | ✅ Done |
 | UC-02 | UIB-22 | UIB-31 | Generate response using only authorized content | 0 | 0 | ✅ Done |
-| UC-02 | UIB-22 | UIB-35 | Provide citations and links only to authorized documents | 0 | 0 | ✅ Done |
+| UC-02 | UIB-22 | UIB-35 | Provide citations and links only to authorized documents — enriched with display_name + uploaded_at | 7 | 7 | ✅ Done |
 | UC-03 | UIB-39 | UIB-40 | Filter to authorized documents only | 0 | 0 | ✅ Done |
 | UC-03 | UIB-39 | UIB-44 | Neutral response when only restricted documents match | 0 | 0 | ✅ Done |
 | UC-03 | UIB-39 | UIB-48 | Suggest safe next steps (optional, configurable) | 0 | 0 | ✅ Done |
@@ -46,8 +46,8 @@ Last Updated: 2026-03-10
 | UC-10 | UIB-130 | UIB-135 | Route unanswered queries to designated university teams | 0 | 11 | ✅ Done |
 | UC-11 | UIB-139 | UIB-140 | Answer questions about form purpose and usage | 6 | 6 | ✅ Done |
 | UC-11 | UIB-139 | UIB-143 | Guide users on where to find forms | 6 | 5 | ⚠️ Partial (AC4 blocked on UC-16) |
-| UC-12 | UIB-147 | UIB-148 | Detect workflow-execution attempts | 0 | 0 | ❌ Pending |
-| UC-12 | UIB-147 | UIB-152 | Inform users that workflow execution is not supported | 0 | 0 | ❌ Pending |
+| UC-12 | UIB-147 | UIB-148 | Detect workflow-execution attempts | 10 | 10 | ✅ Done |
+| UC-12 | UIB-147 | UIB-152 | Inform users that workflow execution is not supported | 7 | 7 | ✅ Done |
 | UC-13 | UIB-156 | UIB-157 | Detect irrelevant or out-of-scope queries | 0 | 0 | ✅ Done |
 | UC-13 | UIB-156 | UIB-161 | Provide polite decline and scope guidance | 0 | 0 | ✅ Done |
 | UC-14 | UIB-165 | UIB-166 | Detect abusive or harmful queries | 0 | 27 | ✅ Done |

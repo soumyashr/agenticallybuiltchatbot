@@ -7,7 +7,9 @@ from app.auth import decode_token
 from app.models import ChatRequest, ChatResponse, Role
 from app.agent import chat as agent_chat, clear_session, _build_llm
 from app.guardrails import run_guardrails, GuardrailViolation
+from app.workflow_guard import detect_workflow_attempt, WorkflowAttempt
 from app.escalation_store import save_escalation
+from app.config import settings
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -61,7 +63,30 @@ async def chat_endpoint(
         # Fail open — guardrail infrastructure errors never block users
         log.warning("Guardrail infrastructure error (fail open): %s", exc)
 
-    # ── Agent block — only reached if guardrail passed ────────────
+    # ── UC-12: workflow-execution prevention — before agent ───────
+    try:
+        detect_workflow_attempt(req.message)
+    except WorkflowAttempt as wa:
+        log.warning("UC-12 workflow blocked: pattern=%s session=%s",
+                    wa.matched_pattern, req.session_id)
+        try:
+            save_escalation(
+                req.session_id,
+                req.message[:200],
+                user["role"],
+                "workflow_attempt_blocked",
+            )
+        except Exception:
+            log.warning("Failed to log workflow escalation (non-blocking)")
+        return ChatResponse(
+            answer=settings.workflow_refusal_message,
+            session_id=req.session_id,
+            role=user["role"],
+            sources=[],
+            reasoning_steps=0,
+        )
+
+    # ── Agent block — only reached if guardrail + workflow check passed ─
     try:
         result = await agent_chat(
             message=req.message,

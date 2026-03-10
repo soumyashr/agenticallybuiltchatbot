@@ -769,3 +769,33 @@ persisting beyond JWT expiry and accumulating indefinitely.
 - `test_session_ttl_configurable` (TTL4)
 - `test_no_memory_leak_across_sessions` (TTL5)
 - `test_new_session_has_no_prior_context` (TTL6)
+
+---
+
+## Citation Format Enrichment (M1, UIB-35) — 2026-03-11
+
+### Problem
+Citations only showed raw filenames (e.g., `policy_v2.pdf`) and page numbers.
+No display-friendly document names, no upload dates. Validation gap M1 / UIB-35.
+
+### Solution
+1. **`models.py`** — Added `display_name: Optional[str] = None` and `uploaded_at: Optional[str] = None` to `SourceDoc`
+2. **`document_store.py`** — Added `get_document_metadata_map()` returning `{filename: {display_name, uploaded_at}}` for INGESTED docs
+3. **`agent.py`** — Added `_enrich_sources()` function that populates `display_name` and `uploaded_at` from DynamoDB metadata. Called at the end of `_extract_sources()` and in `_direct_faiss_search()` fallback
+4. **`frontend/MessageBubble.jsx`** — Shows `display_name` when available (falls back to raw `source`), shows upload date below citation title
+
+### Key design decisions
+- `source` field (raw filename) preserved for RBAC filter compatibility — `_filter_sources_by_role()` matches on filename
+- Enrichment is best-effort: DynamoDB errors return raw sources safely (no crash)
+- Empty sources list skips DynamoDB call entirely
+- New fields are Optional — backward compatible with existing API consumers
+
+### Tests
+7 tests in `TestCitationFormatUC02` class (`backend/tests/test_agent_logic.py`):
+- `test_enriched_source_has_display_name` (AC1)
+- `test_enriched_source_has_uploaded_at` (AC2)
+- `test_unknown_file_stays_raw` (AC3)
+- `test_metadata_error_returns_raw_sources` (AC4)
+- `test_extract_sources_enriches_results` (AC5)
+- `test_empty_sources_no_enrichment_call` (AC6)
+- `test_source_doc_new_fields_optional` (AC7)

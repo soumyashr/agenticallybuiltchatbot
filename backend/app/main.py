@@ -49,6 +49,8 @@ async def startup() -> None:
     from app.escalation_store import init_escalation_table
     init_escalation_table()
     log.info("EscalationStore: DynamoDB table '%s'", settings.escalation_table)
+    log.info("UC-12 workflow_patterns: %s",
+             settings.workflow_patterns if settings.workflow_patterns else "(using defaults)")
     log.info("Startup complete.")
 
 

@@ -13,7 +13,7 @@ from app.config import settings
 from app.models import Role, SourceDoc
 from app.tools import make_search_tools
 from app.escalation_store import save_escalation
-from app.document_store import get_allowed_roles_map
+from app.document_store import get_allowed_roles_map, get_document_metadata_map
 
 log = logging.getLogger(__name__)
 
@@ -252,10 +252,28 @@ def clear_session(session_id: str) -> None:
 
 # ── Source extraction from intermediate steps ────────────────
 
+def _enrich_sources(sources: list[SourceDoc]) -> list[SourceDoc]:
+    """Add display_name and uploaded_at from DynamoDB document metadata."""
+    if not sources:
+        return sources
+    try:
+        meta_map = get_document_metadata_map()
+    except Exception as exc:
+        log.warning("Citation enrichment: cannot load metadata (%s); returning raw sources.", exc)
+        return sources
+    for src in sources:
+        meta = meta_map.get(src.source)
+        if meta:
+            src.display_name = meta.get("display_name") or None
+            src.uploaded_at = meta.get("uploaded_at") or None
+    return sources
+
+
 def _extract_sources(intermediate_steps: list[Any]) -> list[SourceDoc]:
     """
     Parse source citations from agent's tool observation text.
     Format expected: "Source: filename.pdf, Page: 3"
+    Enriches with display_name and uploaded_at from DynamoDB metadata.
     """
     sources: list[SourceDoc] = []
     seen: set[str] = set()
@@ -279,7 +297,7 @@ def _extract_sources(intermediate_steps: list[Any]) -> list[SourceDoc]:
             snippet = " ".join(lines[1:])[:200] + "…" if len(lines) > 1 else ""
             sources.append(SourceDoc(source=source_name, page=page, snippet=snippet))
 
-    return sources
+    return _enrich_sources(sources)
 
 
 # ── Post-generation RBAC filter on citations ─────────────────
@@ -365,6 +383,8 @@ async def _direct_faiss_search(
             lines   = block.strip().split("\n")
             snippet = " ".join(lines[1:])[:200] + "…" if len(lines) > 1 else ""
             sources.append(SourceDoc(source=source_name, page=page, snippet=snippet))
+
+    sources = _enrich_sources(sources)
 
     # Single LLM call to synthesise
     llm = _build_llm()

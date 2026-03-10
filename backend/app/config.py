@@ -87,6 +87,14 @@ class Settings(BaseSettings):
         "https://gazfq7ai7a.ap-south-1.awsapprunner.com",
     ]
 
+    # UC-12 Workflow Prevention
+    workflow_patterns: str = ""  # pipe-separated regex overrides; empty = use defaults
+    workflow_refusal_message: str = (
+        "I can't submit, approve, or process forms for you. "
+        "Please use the official system or portal to complete this step. "
+        "I can help you understand a form's purpose or how to find it."
+    )
+
     # UC-14 Guardrails
     guardrail_max_length: int = 2000
     guardrail_layer2_enabled: bool = True
