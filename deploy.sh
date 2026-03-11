@@ -151,12 +151,14 @@ fi
 if [ "$DEPLOY_FE" = true ]; then
   header "STEP 5 — Build & Push Frontend"
   cd "$REPO_DIR"
+  # VITE_API_URL must be passed at build time — Vite bakes it into the bundle
   docker build --no-cache \
     -f docker/Dockerfile.frontend \
+    --build-arg VITE_API_URL=$BACKEND_URL \
     -t $ECR_BASE/$FRONTEND_REPO:latest \
     . || fail "Frontend build failed"
   docker push $ECR_BASE/$FRONTEND_REPO:latest || fail "Frontend push failed"
-  ok "Frontend image pushed"
+  ok "Frontend image pushed (VITE_API_URL=$BACKEND_URL)"
 fi
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
