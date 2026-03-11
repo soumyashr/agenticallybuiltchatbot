@@ -1399,3 +1399,32 @@ class TestCitationFormatUC02:
         assert hasattr(enriched[0], "source")
         assert hasattr(enriched[0], "display_name")
         assert hasattr(enriched[0], "uploaded_at")
+
+
+# ═══════════════════════════════════════════════════════════════
+# Retrieval precision guards
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestRetrieverPrecision:
+    # AC: UIB-22-PRECISION-1
+    def test_retriever_k_default_is_3(self):
+        """Retriever top_k default must be 3 to avoid low-relevance chunks"""
+        from app.config import Settings
+        fresh = Settings(retriever_top_k=Settings.model_fields["retriever_top_k"].default)
+        assert fresh.retriever_top_k == 3, (
+            f"retriever_top_k default is {fresh.retriever_top_k}, expected 3. "
+            "k=5 causes false positives like Student_Campus_Services "
+            "appearing in elevator queries."
+        )
+
+    # AC: UIB-22-PRECISION-2
+    def test_retriever_k_not_higher_than_3(self):
+        """Guard against k being increased without review"""
+        from app.config import Settings
+        default_k = Settings.model_fields["retriever_top_k"].default
+        assert default_k <= 3, (
+            f"retriever_top_k default is {default_k}, must not exceed 3 "
+            "without retrieval precision review. Higher k causes "
+            "irrelevant chunks."
+        )

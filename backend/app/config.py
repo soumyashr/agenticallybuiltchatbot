@@ -104,7 +104,7 @@ class Settings(BaseSettings):
     vector_store_dir: str = "vector_store"
     chunk_size: int = 1000
     chunk_overlap: int = 200
-    retriever_top_k: int = 5
+    retriever_top_k: int = 3
     max_history_turns: int = 10
     session_memory_ttl_seconds: int = 28800  # 8 hours, matches JWT expiry
 
