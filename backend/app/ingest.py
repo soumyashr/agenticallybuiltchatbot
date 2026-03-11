@@ -118,16 +118,24 @@ def run_pending() -> None:
     reload_vector_store()
 
 
-def run_after_delete() -> None:
+def run_after_delete(deleted_filename: str | None = None) -> None:
     """
     Rebuild index from all remaining INGESTED documents.
     Called by DELETE /admin/documents/{id}.
+
+    For Azure AI Search, explicitly deletes chunks belonging to the
+    deleted document before upserting remaining chunks.
     """
+    provider = settings.ai_provider.lower()
+
+    # Azure AI Search: explicitly delete chunks for the removed document
+    if provider == "azure_openai" and deleted_filename:
+        _delete_chunks_from_azure(deleted_filename)
+
     chunks = _load_ingested_chunks()
     if chunks:
         _build_index(chunks)
     else:
-        provider = settings.ai_provider.lower()
         if provider != "azure_openai":
             # Only delete local FAISS files; Azure Search index persists
             import shutil
@@ -140,6 +148,40 @@ def run_after_delete() -> None:
 
 
 # ── Internal helpers ─────────────────────────────────────────
+
+def _delete_chunks_from_azure(source_filename: str) -> None:
+    """Delete all chunks in Azure AI Search that belong to *source_filename*."""
+    from azure.core.credentials import AzureKeyCredential
+    from azure.search.documents import SearchClient
+
+    credential = AzureKeyCredential(settings.azure_search_admin_key)
+    search_client = SearchClient(
+        endpoint=settings.azure_search_endpoint,
+        index_name=settings.azure_search_index,
+        credential=credential,
+    )
+
+    results = search_client.search(
+        search_text="*",
+        filter=f"source eq '{source_filename}'",
+        select=["id"],
+        top=1000,
+    )
+    ids_to_delete = [{"id": r["id"]} for r in results]
+
+    if ids_to_delete:
+        search_client.delete_documents(documents=ids_to_delete)
+        log.info(
+            "Azure Search: deleted %d chunks for '%s'.",
+            len(ids_to_delete),
+            source_filename,
+        )
+    else:
+        log.warning(
+            "Azure Search: no chunks found for '%s' — nothing to delete.",
+            source_filename,
+        )
+
 
 def _load_ingested_chunks(exclude_filename: str | None = None) -> list:
     """Re-chunk all currently INGESTED documents (for rebuild after delete)."""

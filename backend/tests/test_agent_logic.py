@@ -1628,3 +1628,93 @@ class TestIrrelevantQueryUC13:
         from app.agent import REACT_TEMPLATE
         template_lower = REACT_TEMPLATE.lower()
         assert "weather" in template_lower or "sports" in template_lower or "off-topic" in template_lower
+
+
+# ═══════════════════════════════════════════════════════════════
+# Document delete — Azure AI Search chunk cleanup
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestDocumentDeleteAzureChunks:
+
+    # AC: UIB-DELETE-1 — _delete_chunks_from_azure calls search + delete
+    @patch("app.ingest.settings")
+    def test_delete_chunks_calls_search_and_delete(self, mock_settings):
+        """_delete_chunks_from_azure finds chunk IDs then deletes them."""
+        mock_settings.azure_search_admin_key = "fake-key"
+        mock_settings.azure_search_endpoint = "https://fake.search.windows.net"
+        mock_settings.azure_search_index = "test-index"
+
+        from app.ingest import _delete_chunks_from_azure
+
+        fake_results = [{"id": "chunk-1"}, {"id": "chunk-2"}, {"id": "chunk-3"}]
+
+        with patch("azure.search.documents.SearchClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.search.return_value = iter(fake_results)
+            MockClient.return_value = mock_client
+
+            _delete_chunks_from_azure("test_doc.pdf")
+
+            mock_client.search.assert_called_once_with(
+                search_text="*",
+                filter="source eq 'test_doc.pdf'",
+                select=["id"],
+                top=1000,
+            )
+            mock_client.delete_documents.assert_called_once_with(
+                documents=[{"id": "chunk-1"}, {"id": "chunk-2"}, {"id": "chunk-3"}]
+            )
+
+    # AC: UIB-DELETE-2 — zero chunks → warning, no delete call
+    @patch("app.ingest.settings")
+    def test_delete_chunks_zero_chunks_warns(self, mock_settings):
+        """When no chunks found for filename, logs warning and skips delete."""
+        mock_settings.azure_search_admin_key = "fake-key"
+        mock_settings.azure_search_endpoint = "https://fake.search.windows.net"
+        mock_settings.azure_search_index = "test-index"
+
+        from app.ingest import _delete_chunks_from_azure
+
+        with patch("azure.search.documents.SearchClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.search.return_value = iter([])  # no chunks
+            MockClient.return_value = mock_client
+
+            _delete_chunks_from_azure("nonexistent.pdf")
+
+            mock_client.delete_documents.assert_not_called()
+
+    # AC: UIB-DELETE-3 — run_after_delete passes filename to azure delete
+    @patch("app.ingest.reload_vector_store")
+    @patch("app.ingest._build_index")
+    @patch("app.ingest._load_ingested_chunks", return_value=[])
+    @patch("app.ingest._delete_chunks_from_azure")
+    @patch("app.ingest.settings")
+    def test_run_after_delete_calls_azure_delete(
+        self, mock_settings, mock_del, mock_load, mock_build, mock_reload
+    ):
+        """run_after_delete(deleted_filename=X) calls _delete_chunks_from_azure(X)."""
+        mock_settings.ai_provider = "azure_openai"
+
+        from app.ingest import run_after_delete
+        run_after_delete(deleted_filename="removed_doc.pdf")
+
+        mock_del.assert_called_once_with("removed_doc.pdf")
+
+    # AC: UIB-DELETE-4 — run_after_delete without filename skips azure delete
+    @patch("app.ingest.reload_vector_store")
+    @patch("app.ingest._build_index")
+    @patch("app.ingest._load_ingested_chunks", return_value=[MagicMock()])
+    @patch("app.ingest._delete_chunks_from_azure")
+    @patch("app.ingest.settings")
+    def test_run_after_delete_no_filename_skips_azure_delete(
+        self, mock_settings, mock_del, mock_load, mock_build, mock_reload
+    ):
+        """run_after_delete() without filename does NOT call _delete_chunks_from_azure."""
+        mock_settings.ai_provider = "azure_openai"
+
+        from app.ingest import run_after_delete
+        run_after_delete()
+
+        mock_del.assert_not_called()

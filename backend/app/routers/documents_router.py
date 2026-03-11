@@ -179,7 +179,7 @@ def delete_doc(doc_id: str, admin: dict = Depends(require_admin)):
 
     # Rebuild vector index if the doc was part of the index
     if was_ingested:
-        run_after_delete()
+        run_after_delete(deleted_filename=doc["filename"])
         log.info("Vector index rebuilt after deletion.")
 
     return {"deleted": doc_id, "filename": doc["filename"]}
