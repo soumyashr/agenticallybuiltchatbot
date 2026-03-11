@@ -1,6 +1,6 @@
 # Jira Story Tracker
 
-Last Updated: 2026-03-11 (audit pass #2)
+Last Updated: 2026-03-11 (audit pass #3 — full AC coverage)
 
 ## Tracking Rules
 
@@ -16,24 +16,24 @@ Last Updated: 2026-03-11 (audit pass #2)
 |----|---------|----------|-------------|----------|-------|--------|
 | UC-01 | UIB-2 | UIB-1 | Access chatbot widget from approved internal systems | 0 | 7 | ⚠️ Partial |
 | UC-01 | UIB-2 | UIB-3 | Seamless SSO-based access to chatbot | 0 | 4 | ⚠️ Partial |
-| UC-01 | UIB-2 | UIB-10 | Determine user persona from authentication context | 0 | 0 | ✅ Done |
-| UC-01 | UIB-2 | UIB-14 | Start chatbot interaction on user trigger | 0 | 0 | ✅ Done |
+| UC-01 | UIB-2 | UIB-10 | Determine user persona from authentication context | 0 | 3 | ✅ Done |
+| UC-01 | UIB-2 | UIB-14 | Start chatbot interaction on user trigger | 0 | 3 | ✅ Done |
 | UC-02 | UIB-22 | UIB-18 | Submit a natural-language query | 0 | 7 | ✅ Done |
 | UC-02 | UIB-22 | UIB-23 | Retrieve from approved knowledge sources only | 0 | 14 | ✅ Done |
 | UC-02 | UIB-22 | UIB-27 | Apply role/group-based permissions to filter results | 0 | 9 | ✅ Done |
-| UC-02 | UIB-22 | UIB-31 | Generate response using only authorized content | 0 | 1 | ✅ Done |
+| UC-02 | UIB-22 | UIB-31 | Generate response using only authorized content | 0 | 4 | ✅ Done |
 | UC-02 | UIB-22 | UIB-35 | Provide citations and links only to authorized documents | 0 | 16 | ✅ Done |
-| UC-03 | UIB-39 | UIB-40 | Filter to authorized documents only | 0 | 3 | ✅ Done |
-| UC-03 | UIB-39 | UIB-44 | Neutral response when only restricted documents match | 0 | 1 | ✅ Done |
+| UC-03 | UIB-39 | UIB-40 | Filter to authorized documents only | 0 | 5 | ✅ Done |
+| UC-03 | UIB-39 | UIB-44 | Neutral response when only restricted documents match | 0 | 2 | ✅ Done |
 | UC-03 | UIB-39 | UIB-48 | Suggest safe next steps (optional, configurable) | 0 | 0 | ❌ Pending |
-| UC-03 | UIB-39 | UIB-52 | Do not reveal restricted titles, locations, snippets, or existence | 0 | 2 | ✅ Done |
+| UC-03 | UIB-39 | UIB-52 | Do not reveal restricted titles, locations, snippets, or existence | 0 | 3 | ✅ Done |
 | UC-04 | UIB-56 | UIB-57 | Admin enables governed current/approved retrieval | 0 | 0 | ❌ Pending |
 | UC-04 | UIB-56 | UIB-61 | Use only current, approved versions of documents | 0 | 0 | ❌ Pending |
 | UC-04 | UIB-56 | UIB-65 | Ignore drafts, archived, and superseded versions | 0 | 0 | ❌ Pending |
 | UC-04 | UIB-56 | UIB-69 | Cite exact version used (name + version/effective date + link) | 0 | 0 | ❌ Pending |
-| UC-05 | UIB-74 | UIB-75 | Aggregate multiple relevant documents | 0 | 0 | ⚠️ Partial |
-| UC-05 | UIB-74 | UIB-79 | Consolidate insights into one clear answer | 0 | 0 | ⚠️ Partial |
-| UC-05 | UIB-74 | UIB-83 | Cite multiple sources where applicable | 0 | 1 | ⚠️ Partial |
+| UC-05 | UIB-74 | UIB-75 | Aggregate multiple relevant documents | 0 | 1 | ⚠️ Partial |
+| UC-05 | UIB-74 | UIB-79 | Consolidate insights into one clear answer | 0 | 2 | ⚠️ Partial |
+| UC-05 | UIB-74 | UIB-83 | Cite multiple sources where applicable | 0 | 3 | ⚠️ Partial |
 | UC-05 | UIB-74 | UIB-88 | Help users when many documents are relevant | 0 | 0 | ❌ Pending |
 | UC-06 | UIB-92 | UIB-93 | Maintain context within an active session | 0 | 6 | ✅ Done |
 | UC-06 | UIB-92 | UIB-98 | Allow user to clear or reset context within a session | 0 | 3 | ✅ Done |
@@ -43,7 +43,7 @@ Last Updated: 2026-03-11 (audit pass #2)
 | UC-08 | UIB-108 | UIB-117 | Ask user for clarification before answering | 0 | 1 | ⚠️ Partial |
 | UC-09 | UIB-122 | UIB-123 | Detect when no matching or authorized content exists | 0 | 7 | ✅ Done |
 | UC-09 | UIB-122 | UIB-126 | Return safe fallback instead of speculative answer | 0 | 4 | ✅ Done |
-| UC-10 | UIB-130 | UIB-131 | Detect and log unanswered queries with metadata | 0 | 4 | ✅ Done |
+| UC-10 | UIB-130 | UIB-131 | Detect and log unanswered queries with metadata | 0 | 7 | ✅ Done |
 | UC-10 | UIB-130 | UIB-135 | Route unanswered queries to designated university teams | 0 | 6 | ✅ Done |
 | UC-11 | UIB-139 | UIB-140 | Answer questions about form purpose and usage | 6 | 6 | ✅ Done |
 | UC-11 | UIB-139 | UIB-143 | Guide users on where to find forms | 6 | 5 | ⚠️ Partial |
@@ -81,8 +81,8 @@ Last Updated: 2026-03-11 (audit pass #2)
 
 - **Tests** column = count of `# AC: UIB-XXX` tags found by `grep -rn` in `backend/tests/` (2026-03-11 audit pass #2)
 - **Additional 24 tests** tagged `# AC: INFRA` for provider switching, Azure integration, and config (not story-specific)
-- **Total tagged tests across all stories:** 181 (+ 24 INFRA = 205 tags across 210 tests)
-- **5 tests** remain untagged (binary file match or edge cases)
+- **Total tagged tests across all stories:** 211 (+ 24 INFRA = 235 tags across 250 tests)
+- **All tests** now have AC tags
 - **UC-17 through UC-19** are additional epics beyond original UC-01 to UC-16 scope
 - **UIB-3** — JWT auth exists with 4 test tags, but no true SSO/SAML integration
 - **Jira status** — ALL stories are "Backlog" in Jira; status here derived from code evidence

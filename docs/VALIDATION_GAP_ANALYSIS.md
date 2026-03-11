@@ -124,6 +124,20 @@ for App Runner compatibility.
 - 28 previously untagged tests now have AC references
 - Total tests: 210 (was 193), all passing
 
+### Audit Pass #3 — 2026-03-11 (full AC coverage)
+
+New test classes added (30 tests total):
+- UC-01/UIB-10: TestPersonaDerivationUC01 (3 tests) — JWT role, session mapping, tool scoping
+- UC-01/UIB-14: TestChatbotStartUC01 (3 tests) — health, auth token, TokenResponse
+- UC-02/UIB-31: TestAuthorizedContentUC02 (3 tests) — RBAC filter, safe message, source format
+- UC-05/UIB-75,79,83: TestMultiDocUC05 (5 tests) — multi-doc retrieval, tool, citations
+- UC-06/UIB-92,93: TestConversationalContextUC06 (3 tests) — memory, config, isolation
+- UC-02/UIB-23: TestRAGConfigUC02 (4 tests) — chunk/iteration config defaults
+- UC-10/UIB-130: TestEscalationConfigUC10 (3 tests) — escalation config
+- UC-03/UIB-40,44,52: TestRBACSearchEnforcementUC03 (4 tests) — OData filter, FAISS, neutral
+- UC-12/UIB-147: TestWorkflowPreventionConfigUC12 (2 tests) — refusal message, patterns config
+- Total: 250 tests, 0 failures
+
 ### Remaining Gaps (unchanged)
 - M2: Response organization/summarization — prompt tuning needed
 - M3: Audit log for document changes — not implemented

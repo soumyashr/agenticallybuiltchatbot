@@ -1,6 +1,6 @@
 # Test Record — Happiest Minds Knowledge Hub
 
-**Date:** 2026-03-11 (audit pass #2)
+**Date:** 2026-03-11 (audit pass #3 — full AC coverage)
 **Codebase:** /Users/soumya.shrivastava/AgenticallyBuiltChatBot
 
 ---
@@ -9,8 +9,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 210 |
-| Pass | 210 |
+| Total tests | 250 |
+| Pass | 250 |
 | Fail | 0 |
 | Test files | 10 |
 | Python | 3.11.9 |
@@ -20,8 +20,8 @@ Both provider configurations tested:
 
 | Provider | Tests | Passed | Failed |
 |----------|-------|--------|--------|
-| AI_PROVIDER=openai | 210 | 210 | 0 |
-| AI_PROVIDER=azure_openai | 210 | 210 | 0 |
+| AI_PROVIDER=openai | 250 | 250 | 0 |
+| AI_PROVIDER=azure_openai | 250 | 250 | 0 |
 
 ---
 
@@ -310,4 +310,25 @@ cd backend && python3 -m pytest tests/test_document_store.py -v
 
 ## Known Issues
 
-None. All 210 tests pass for both AI_PROVIDER values.
+None. All 250 tests pass for both AI_PROVIDER values.
+
+---
+
+## New Tests Added (2026-03-11 audit pass #3 — full AC coverage)
+
+| Class | Tests | AC Tags | Description |
+|-------|-------|---------|-------------|
+| TestPersonaDerivationUC01 | 3 | UIB-10 | JWT role claim, role→session mapping, role-scoped tools |
+| TestChatbotStartUC01 | 3 | UIB-14 | Health endpoint, auth token endpoint, TokenResponse model |
+| TestAuthorizedContentUC02 | 3 | UIB-31 | RBAC filter, empty results safe message, source+page format |
+| TestMultiDocUC05 | 5 | UIB-75/79/83 | Multi-doc retrieval k, tool registration, description, multi-source extract, numbered format |
+| TestConversationalContextUC06 | 3 | UIB-92/93 | Buffer window memory, max_history_turns config, session isolation |
+| TestRAGConfigUC02 | 4 | UIB-23 | chunk_size, chunk_overlap, agent_max_iterations defaults, max(config,7) formula |
+| TestEscalationConfigUC10 | 3 | UIB-130/131 | escalation_enabled, slack_webhook, escalation_table config |
+| TestRBACSearchEnforcementUC03 | 4 | UIB-40/44/52 | OData filter, FAISS client-side filter, neutral message, no file paths |
+| TestWorkflowPreventionConfigUC12 | 2 | UIB-147 | workflow_refusal_message, workflow_patterns config |
+| TestDocumentDeleteAzureChunks | 4 | UIB-DELETE | Azure chunk delete, zero chunks warning, run_after_delete integration |
+| TestReindexEndpoint | 6 | UIB-REINDEX | Student/faculty 403, wipe+rebuild, empty index, Azure failure, reload |
+| TestRetrieverPrecision | 2 | UIB-22-PRECISION | k=3 default, k<=3 guard |
+
+**Total new tests this session:** 30 (from 220 → 250)

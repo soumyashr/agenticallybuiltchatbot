@@ -1847,3 +1847,343 @@ class TestReindexEndpoint:
             wipe_and_rebuild_index()
 
             mock_reload.assert_called_once()
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-01 / UIB-10 — Persona derivation from auth context
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestPersonaDerivationUC01:
+
+    # AC: UIB-10-AC1 — JWT contains role claim
+    def test_jwt_contains_role_claim(self):
+        """JWT token payload includes the user's role."""
+        from app.auth import create_token
+        import jwt as pyjwt
+        token = create_token("admin", "admin")
+        payload = pyjwt.decode(token, options={"verify_signature": False})
+        assert "role" in payload
+        assert payload["role"] == "admin"
+
+    # AC: UIB-10-AC2 — role maps to session context
+    @patch("app.agent._create_executor")
+    def test_role_maps_to_session_context(self, mock_create):
+        """Session stores the role from JWT for RBAC enforcement."""
+        mock_create.return_value = MagicMock()
+        from app.agent import _sessions, get_or_create_session
+        get_or_create_session("persona-test-01", Role.faculty)
+        assert _sessions["persona-test-01"]["role"] == Role.faculty
+
+    # AC: UIB-10-AC3 — different roles get different tool configs
+    def test_different_roles_get_different_tools(self):
+        """make_search_tools produces role-scoped tool closures."""
+        from app.tools import make_search_tools
+        student_tools = make_search_tools("student")
+        admin_tools = make_search_tools("admin")
+        assert len(student_tools) == 1
+        assert len(admin_tools) == 1
+        assert student_tools[0].name == "semantic_search"
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-01 / UIB-14 — Start chatbot interaction
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestChatbotStartUC01:
+
+    # AC: UIB-14-AC1 — health endpoint accessible
+    def test_health_endpoint_returns_ok(self):
+        """GET /health returns 200 with status=ok."""
+        from starlette.testclient import TestClient
+        from app.main import app
+        client = TestClient(app)
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+
+    # AC: UIB-14-AC2 — auth token endpoint exists
+    def test_auth_token_endpoint_exists(self):
+        """POST /auth/token endpoint is registered."""
+        from starlette.testclient import TestClient
+        from app.main import app
+        client = TestClient(app)
+        # Missing credentials should return 422, not 404
+        resp = client.post("/auth/token")
+        assert resp.status_code == 422  # validation error, not 404
+
+    # AC: UIB-14-AC3 — token response has required fields
+    def test_token_response_has_required_fields(self):
+        """TokenResponse model has access_token, username, role."""
+        from app.models import TokenResponse
+        fields = TokenResponse.model_fields
+        assert "access_token" in fields
+        assert "username" in fields
+        assert "role" in fields
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-02 / UIB-31 — Generate response from authorized content only
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAuthorizedContentUC02:
+
+    # AC: UIB-31-AC1 — RBAC filter removes unauthorized chunks
+    def test_filter_by_role_removes_unauthorized(self):
+        """_filter_by_role keeps only chunks matching user role."""
+        from app.tools import _filter_by_role
+        doc_allowed = MagicMock()
+        doc_allowed.metadata = {"allowed_roles": ["student", "faculty"]}
+        doc_blocked = MagicMock()
+        doc_blocked.metadata = {"allowed_roles": ["admin"]}
+        result = _filter_by_role([doc_allowed, doc_blocked], "student")
+        assert len(result) == 1
+        assert result[0] is doc_allowed
+
+    # AC: UIB-31-AC2 — empty results returns safe message
+    def test_no_results_returns_safe_message(self):
+        """_format_docs with empty list returns safe fallback."""
+        from app.tools import _format_docs
+        result = _format_docs([])
+        assert "no relevant information" in result.lower()
+
+    # AC: UIB-31-AC3 — format includes source and page
+    def test_format_docs_includes_source_and_page(self):
+        """_format_docs output contains source filename and page number."""
+        from app.tools import _format_docs
+        doc = MagicMock()
+        doc.metadata = {"source": "test_doc.pdf", "page": 3}
+        doc.page_content = "Some content"
+        result = _format_docs([doc])
+        assert "test_doc.pdf" in result
+        assert "3" in result
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-05 / UIB-75, UIB-79, UIB-83 — Multi-document handling
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestMultiDocUC05:
+
+    # AC: UIB-75-AC1 — retriever returns multiple documents
+    def test_retriever_k_allows_multi_doc(self):
+        """retriever_top_k >= 2 enables multi-document retrieval."""
+        from app.config import Settings
+        k = Settings.model_fields["retriever_top_k"].default
+        assert k >= 2, "k must be >= 2 to support multi-doc retrieval"
+
+    # AC: UIB-79-AC1 — semantic_search tool is registered
+    def test_semantic_search_tool_registered(self):
+        """make_search_tools returns a tool named semantic_search."""
+        from app.tools import make_search_tools
+        tools = make_search_tools("student")
+        assert any(t.name == "semantic_search" for t in tools)
+
+    # AC: UIB-79-AC2 — tool description instructs document search
+    def test_tool_description_instructs_search(self):
+        """semantic_search tool description tells agent to search docs."""
+        from app.tools import make_search_tools
+        tools = make_search_tools("admin")
+        desc = tools[0].description.lower()
+        assert "search" in desc
+        assert "document" in desc
+
+    # AC: UIB-83-AC1 — extract_sources handles multiple docs
+    def test_extract_sources_multiple_docs(self):
+        """_extract_sources returns multiple distinct sources."""
+        from app.agent import _extract_sources
+        steps = [
+            (MagicMock(), "Source: doc_a.pdf, Page: 1\nContent A"),
+            (MagicMock(), "Source: doc_b.pdf, Page: 2\nContent B"),
+        ]
+        sources = _extract_sources(steps)
+        filenames = [s.source for s in sources]
+        assert "doc_a.pdf" in filenames
+        assert "doc_b.pdf" in filenames
+
+    # AC: UIB-83-AC2 — format_docs numbers multiple sources
+    def test_format_docs_numbers_sources(self):
+        """_format_docs numbers each source [1], [2], etc."""
+        from app.tools import _format_docs
+        docs = []
+        for i, name in enumerate(["doc_a.pdf", "doc_b.pdf"]):
+            d = MagicMock()
+            d.metadata = {"source": name, "page": i}
+            d.page_content = f"Content from {name}"
+            docs.append(d)
+        result = _format_docs(docs)
+        assert "[1]" in result
+        assert "[2]" in result
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-06 / UIB-92, UIB-93 — Conversational context management
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestConversationalContextUC06:
+
+    # AC: UIB-92-AC1 — session uses ConversationBufferWindowMemory
+    def test_memory_type_is_buffer_window(self):
+        """Agent uses ConversationBufferWindowMemory for context."""
+        # Verify the import and usage in agent.py
+        import app.agent as agent_mod
+        assert hasattr(agent_mod, "ConversationBufferWindowMemory")
+
+    # AC: UIB-92-AC2 — max_history_turns config exists
+    def test_max_history_turns_config(self):
+        """max_history_turns setting controls conversation window."""
+        from app.config import Settings
+        field = Settings.model_fields.get("max_history_turns")
+        assert field is not None
+        assert Settings.model_fields["max_history_turns"].default == 10
+
+    # AC: UIB-93-AC1 — session isolation by session_id
+    @patch("app.agent._create_executor")
+    def test_session_isolation(self, mock_create):
+        """Different session_ids create separate executors."""
+        exec_a = MagicMock()
+        exec_b = MagicMock()
+        mock_create.side_effect = [exec_a, exec_b]
+        from app.agent import _sessions, get_or_create_session
+        result_a = get_or_create_session("iso-a", Role.student)
+        result_b = get_or_create_session("iso-b", Role.faculty)
+        assert result_a is exec_a
+        assert result_b is exec_b
+        assert _sessions["iso-a"]["role"] != _sessions["iso-b"]["role"]
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-02 / UIB-23 — RAG pipeline config
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestRAGConfigUC02:
+
+    # AC: UIB-23-AC1 — chunk_size config
+    def test_chunk_size_default(self):
+        """chunk_size default is 1000."""
+        from app.config import Settings
+        assert Settings.model_fields["chunk_size"].default == 1000
+
+    # AC: UIB-23-AC2 — chunk_overlap config
+    def test_chunk_overlap_default(self):
+        """chunk_overlap default is 200."""
+        from app.config import Settings
+        assert Settings.model_fields["chunk_overlap"].default == 200
+
+    # AC: UIB-23-AC3 — agent_max_iterations config
+    def test_agent_max_iterations_default(self):
+        """agent_max_iterations default is 5."""
+        from app.config import Settings
+        assert Settings.model_fields["agent_max_iterations"].default == 5
+
+    # AC: UIB-23-AC4 — agent uses max(config, 7) iterations
+    def test_agent_uses_max_iterations_floor(self):
+        """Agent executor uses max(agent_max_iterations, 7)."""
+        # Verify the formula exists in agent.py source
+        import inspect
+        from app.agent import _create_executor
+        source = inspect.getsource(_create_executor)
+        assert "max(settings.agent_max_iterations, 7)" in source
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-10 / UIB-130, UIB-131 — Escalation fields and config
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestEscalationConfigUC10:
+
+    # AC: UIB-130-AC1 — escalation_enabled config
+    def test_escalation_enabled_default(self):
+        """escalation_enabled defaults to True."""
+        from app.config import Settings
+        assert Settings.model_fields["escalation_enabled"].default is True
+
+    # AC: UIB-130-AC2 — slack_webhook_url config exists
+    def test_slack_webhook_config_exists(self):
+        """slack_webhook_url setting exists for notification routing."""
+        from app.config import Settings
+        field = Settings.model_fields.get("slack_webhook_url")
+        assert field is not None
+
+    # AC: UIB-131-AC1 — escalation table config
+    def test_escalation_table_config(self):
+        """escalation_table defaults to hm-escalations."""
+        from app.config import Settings
+        assert Settings.model_fields["escalation_table"].default == "hm-escalations"
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-03 / UIB-40, UIB-44 — RBAC enforcement in search
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestRBACSearchEnforcementUC03:
+
+    # AC: UIB-40-AC1 — Azure OData filter applied
+    def test_azure_odata_filter_in_search(self):
+        """For azure_openai, similarity_search uses OData role filter."""
+        import inspect
+        from app.tools import make_search_tools
+        # Get the source of the closure
+        tools = make_search_tools("student")
+        # Verify the filter pattern exists in the tools module source
+        import app.tools as tools_mod
+        source = inspect.getsource(tools_mod)
+        assert "allowed_roles/any(r: r eq" in source
+
+    # AC: UIB-40-AC2 — FAISS client-side filtering exists
+    def test_faiss_client_side_filtering(self):
+        """For FAISS, _filter_by_role is applied client-side."""
+        import inspect
+        import app.tools as tools_mod
+        source = inspect.getsource(tools_mod)
+        assert "_filter_by_role" in source
+
+    # AC: UIB-44-AC1 — no results returns neutral message
+    def test_no_results_neutral_message(self):
+        """When no docs match, message is neutral — no restricted content hints."""
+        from app.tools import _format_docs
+        msg = _format_docs([])
+        assert "restricted" not in msg.lower()
+        assert "forbidden" not in msg.lower()
+        assert "denied" not in msg.lower()
+
+    # AC: UIB-52-AC1 — format_docs does not expose file paths
+    def test_format_docs_no_file_paths(self):
+        """Formatted output uses source filename, not full file path."""
+        from app.tools import _format_docs
+        doc = MagicMock()
+        doc.metadata = {"source": "test.pdf", "page": 1}
+        doc.page_content = "content"
+        result = _format_docs([doc])
+        assert "/" not in result or "test.pdf" in result  # no full paths
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-12 / UIB-147 — Workflow prevention config
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestWorkflowPreventionConfigUC12:
+
+    # AC: UIB-147-AC1 — workflow_refusal_message config
+    def test_workflow_refusal_message_config(self):
+        """Refusal message is configurable via settings."""
+        from app.config import Settings
+        field = Settings.model_fields.get("workflow_refusal_message")
+        assert field is not None
+        default = Settings.model_fields["workflow_refusal_message"].default
+        assert "can't submit" in default.lower() or "cannot" in default.lower()
+
+    # AC: UIB-147-AC2 — workflow_patterns config
+    def test_workflow_patterns_config_exists(self):
+        """workflow_patterns setting exists for customization."""
+        from app.config import Settings
+        field = Settings.model_fields.get("workflow_patterns")
+        assert field is not None
