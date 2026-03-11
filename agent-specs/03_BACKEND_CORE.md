@@ -18,8 +18,8 @@ touch backend/vector_store/.gitkeep
 touch backend/app/__init__.py
 touch backend/app/routers/__init__.py
 cd backend
-python3.11 -m venv .venv
-source .venv/bin/activate
+python3.11 -m venv .agenticallybuiltchatbot_venv
+source .agenticallybuiltchatbot_venv/bin/activate
 ```
 
 ---
@@ -547,7 +547,7 @@ def health() -> dict:
 
 ```bash
 cd /Users/soumya.shrivastava/AgenticallyBuiltChatBot/backend
-source .venv/bin/activate
+source .agenticallybuiltchatbot_venv/bin/activate
 uvicorn app.main:app --reload --port 8000
 ```
 

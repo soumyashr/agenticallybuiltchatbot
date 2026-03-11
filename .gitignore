@@ -3,7 +3,7 @@ backend/.env
 *.env
 __pycache__/
 *.pyc
-.venv/
+.agenticallybuiltchatbot_venv/
 node_modules/
 backend/vector_store/
 backend/users.db
@@ -12,7 +12,7 @@ backend/documents.db
 .DS_Store
 dist/
 .agenticallybuiltchatbot_venv/
-.venv/
+.agenticallybuiltchatbot_venv/
 venv/
 __pycache__/
 *.pyc

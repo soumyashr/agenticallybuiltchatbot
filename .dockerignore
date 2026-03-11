@@ -1,7 +1,7 @@
 __pycache__/
 *.pyc
 *.pyo
-.venv/
+.agenticallybuiltchatbot_venv/
 venv/
 backend/.venv/
 node_modules/

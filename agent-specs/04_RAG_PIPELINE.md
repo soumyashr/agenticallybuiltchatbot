@@ -622,7 +622,7 @@ backend/data/feature_7_document.pdf   ← admin only
 
 Then test ingest manually from Python:
 ```python
-# Run from backend/ with .venv active
+# Run from backend/ with .agenticallybuiltchatbot_venv active
 import os; os.chdir("backend")
 from app.document_store import init_db, register_document
 from app.ingest import run_pending

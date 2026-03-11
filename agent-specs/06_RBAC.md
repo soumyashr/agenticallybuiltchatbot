@@ -175,7 +175,7 @@ print("=" * 62)
 Run:
 ```bash
 cd /Users/soumya.shrivastava/AgenticallyBuiltChatBot/backend
-source .venv/bin/activate
+source .agenticallybuiltchatbot_venv/bin/activate
 python3 test_rbac_matrix.py
 ```
 
