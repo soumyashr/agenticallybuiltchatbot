@@ -118,6 +118,58 @@ def run_pending() -> None:
     reload_vector_store()
 
 
+def wipe_and_rebuild_index() -> dict:
+    """
+    Full clean rebuild of the Azure AI Search index.
+    1. Delete ALL chunks from the index
+    2. Re-chunk all INGESTED docs from DynamoDB/disk
+    3. Push fresh chunks to Azure AI Search
+    4. Reload vector store cache
+
+    Returns dict with deleted_chunks and rebuilt_chunks counts.
+    Raises on Azure failure — caller should surface as HTTP 500.
+    """
+    from azure.core.credentials import AzureKeyCredential
+    from azure.search.documents import SearchClient
+
+    credential = AzureKeyCredential(settings.azure_search_admin_key)
+    search_client = SearchClient(
+        endpoint=settings.azure_search_endpoint,
+        index_name=settings.azure_search_index,
+        credential=credential,
+    )
+
+    # Step 1 — wipe all existing chunks
+    results = search_client.search(
+        search_text="*",
+        select=["id"],
+        top=1000,
+    )
+    ids_to_delete = [{"id": r["id"]} for r in results]
+
+    if ids_to_delete:
+        search_client.delete_documents(documents=ids_to_delete)
+        log.info("Reindex: wiped %d chunks from index.", len(ids_to_delete))
+    else:
+        log.info("Reindex: index was already empty.")
+
+    # Step 2 — rebuild from DynamoDB/disk
+    chunks = _load_ingested_chunks()
+    if chunks:
+        _build_index(chunks)
+        log.info("Reindex: rebuilt index with %d chunks.", len(chunks))
+    else:
+        log.warning("Reindex: no ingested docs found — index is empty.")
+
+    # Step 3 — reload cache
+    reload_vector_store()
+
+    return {
+        "deleted_chunks": len(ids_to_delete),
+        "rebuilt_chunks": len(chunks),
+    }
+
+
 def run_after_delete(deleted_filename: str | None = None) -> None:
     """
     Rebuild index from all remaining INGESTED documents.

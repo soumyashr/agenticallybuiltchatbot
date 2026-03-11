@@ -15,6 +15,7 @@
 | DELETE | /admin/documents/{id} | Delete document + rebuild index |
 | GET | /admin/documents/{id}/status | Poll single document status |
 | GET | /documents/my | Return documents accessible to current user's role (any authenticated user) |
+| POST | /admin/reindex | Full wipe + rebuild of Azure AI Search index (admin only) |
 
 ---
 
@@ -255,6 +256,26 @@ Registration in `main.py`:
 app.include_router(documents_router.router,        prefix="/admin", tags=["Admin"])
 app.include_router(documents_router.public_router,                  tags=["Documents"])
 ```
+
+---
+
+## POST /admin/reindex
+
+- **Auth**: Admin only (403 for student/faculty)
+- **Purpose**: Full wipe + rebuild of Azure AI Search index
+- **Use case**: Clean orphan chunks from docs deleted before the delete-fix was applied
+- **Warning**: Index briefly empty during rebuild
+- **Implementation**: `wipe_and_rebuild_index()` in `ingest.py`
+- **Response**:
+  ```json
+  {
+    "status": "success",
+    "message": "Index wiped and rebuilt successfully",
+    "deleted_chunks": N,
+    "rebuilt_chunks": N
+  }
+  ```
+- **Error**: HTTP 500 if Azure wipe or rebuild fails — no silent ignore
 
 ---
 

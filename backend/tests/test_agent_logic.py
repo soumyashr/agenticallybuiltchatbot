@@ -1718,3 +1718,132 @@ class TestDocumentDeleteAzureChunks:
         run_after_delete()
 
         mock_del.assert_not_called()
+
+
+# ═══════════════════════════════════════════════════════════════
+# POST /admin/reindex — full wipe + rebuild
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestReindexEndpoint:
+
+    # AC: UIB-REINDEX-1 — student gets 403
+    def test_reindex_student_gets_403(self):
+        """Non-admin must get 403 on reindex endpoint."""
+        from starlette.testclient import TestClient
+        from app.main import app
+        client = TestClient(app)
+        token = _make_token("student", "student1")
+        resp = client.post(
+            "/admin/reindex",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 403
+
+    # AC: UIB-REINDEX-2 — faculty gets 403
+    def test_reindex_faculty_gets_403(self):
+        """Faculty must get 403 on reindex endpoint."""
+        from starlette.testclient import TestClient
+        from app.main import app
+        client = TestClient(app)
+        token = _make_token("faculty", "faculty1")
+        resp = client.post(
+            "/admin/reindex",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 403
+
+    # AC: UIB-REINDEX-3 — wipe_and_rebuild calls delete then build
+    @patch("app.ingest.reload_vector_store")
+    @patch("app.ingest._build_index")
+    @patch("app.ingest._load_ingested_chunks", return_value=[])
+    @patch("app.ingest.settings")
+    def test_wipe_and_rebuild_calls_delete_then_build(
+        self, mock_settings, mock_load, mock_build, mock_reload
+    ):
+        """wipe_and_rebuild_index must delete all then rebuild."""
+        mock_settings.azure_search_admin_key = "fake-key"
+        mock_settings.azure_search_endpoint = "https://fake.search.windows.net"
+        mock_settings.azure_search_index = "test-index"
+
+        from app.ingest import wipe_and_rebuild_index
+
+        with patch("azure.search.documents.SearchClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.search.return_value = iter([
+                {"id": "chunk-1"}, {"id": "chunk-2"},
+            ])
+            MockClient.return_value = mock_client
+
+            result = wipe_and_rebuild_index()
+
+            mock_client.delete_documents.assert_called_once()
+            assert result["deleted_chunks"] == 2
+            assert result["rebuilt_chunks"] == 0
+
+    # AC: UIB-REINDEX-4 — empty index handled gracefully
+    @patch("app.ingest.reload_vector_store")
+    @patch("app.ingest._build_index")
+    @patch("app.ingest._load_ingested_chunks", return_value=[])
+    @patch("app.ingest.settings")
+    def test_wipe_and_rebuild_handles_empty_index(
+        self, mock_settings, mock_load, mock_build, mock_reload
+    ):
+        """Must handle empty index gracefully — no error."""
+        mock_settings.azure_search_admin_key = "fake-key"
+        mock_settings.azure_search_endpoint = "https://fake.search.windows.net"
+        mock_settings.azure_search_index = "test-index"
+
+        from app.ingest import wipe_and_rebuild_index
+
+        with patch("azure.search.documents.SearchClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.search.return_value = iter([])
+            MockClient.return_value = mock_client
+
+            result = wipe_and_rebuild_index()
+
+            mock_client.delete_documents.assert_not_called()
+            assert result["deleted_chunks"] == 0
+
+    # AC: UIB-REINDEX-5 — Azure failure raises exception
+    @patch("app.ingest.settings")
+    def test_wipe_and_rebuild_raises_on_azure_failure(self, mock_settings):
+        """Must raise if Azure wipe fails — no silent ignore."""
+        mock_settings.azure_search_admin_key = "fake-key"
+        mock_settings.azure_search_endpoint = "https://fake.search.windows.net"
+        mock_settings.azure_search_index = "test-index"
+
+        from app.ingest import wipe_and_rebuild_index
+
+        with patch("azure.search.documents.SearchClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.search.side_effect = Exception("Azure connection failed")
+            MockClient.return_value = mock_client
+
+            with pytest.raises(Exception, match="Azure connection failed"):
+                wipe_and_rebuild_index()
+
+    # AC: UIB-REINDEX-6 — reload_vector_store called after rebuild
+    @patch("app.ingest.reload_vector_store")
+    @patch("app.ingest._build_index")
+    @patch("app.ingest._load_ingested_chunks", return_value=[])
+    @patch("app.ingest.settings")
+    def test_wipe_and_rebuild_calls_reload(
+        self, mock_settings, mock_load, mock_build, mock_reload
+    ):
+        """reload_vector_store must be called after rebuild."""
+        mock_settings.azure_search_admin_key = "fake-key"
+        mock_settings.azure_search_endpoint = "https://fake.search.windows.net"
+        mock_settings.azure_search_index = "test-index"
+
+        from app.ingest import wipe_and_rebuild_index
+
+        with patch("azure.search.documents.SearchClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.search.return_value = iter([])
+            MockClient.return_value = mock_client
+
+            wipe_and_rebuild_index()
+
+            mock_reload.assert_called_once()

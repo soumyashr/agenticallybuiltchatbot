@@ -14,7 +14,7 @@ from app.document_store import (
     get_ingested_documents,
     register_document,
 )
-from app.ingest import run_pending, run_after_delete
+from app.ingest import run_pending, run_after_delete, wipe_and_rebuild_index
 from app.config import settings
 
 log = logging.getLogger(__name__)
@@ -218,4 +218,28 @@ def get_document_status(doc_id: str, admin: dict = Depends(require_admin)):
         "status":      doc["status"],
         "chunk_count": doc["chunk_count"],
         "error_msg":   doc["error_msg"],
+    }
+
+
+# ── 7. Reindex (full wipe + rebuild) ────────────────────────
+
+@router.post("/reindex")
+def reindex(admin: dict = Depends(require_admin)):
+    """
+    Admin only — full wipe and rebuild of Azure AI Search index.
+    Use when index has orphan chunks from documents deleted before
+    the delete-fix was applied.
+    WARNING: Index will be briefly empty during rebuild.
+    """
+    log.info("Reindex triggered by admin: %s", admin["username"])
+    try:
+        result = wipe_and_rebuild_index()
+    except Exception as exc:
+        log.error("Reindex failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Reindex failed: {exc}")
+    return {
+        "status": "success",
+        "message": "Index wiped and rebuilt successfully",
+        "deleted_chunks": result["deleted_chunks"],
+        "rebuilt_chunks": result["rebuilt_chunks"],
     }
