@@ -9,8 +9,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 190 |
-| Pass | 190 |
+| Total tests | 193 |
+| Pass | 193 |
 | Fail | 0 |
 | Test files | 10 |
 | Python | 3.11.9 |
@@ -20,8 +20,8 @@ Both provider configurations tested:
 
 | Provider | Tests | Passed | Failed |
 |----------|-------|--------|--------|
-| AI_PROVIDER=openai | 190 | 190 | 0 |
-| AI_PROVIDER=azure_openai | 190 | 190 | 0 |
+| AI_PROVIDER=openai | 193 | 193 | 0 |
+| AI_PROVIDER=azure_openai | 193 | 193 | 0 |
 
 ---
 
@@ -179,7 +179,7 @@ the browser UI. Lesson: always test CORS at the HTTP layer, not just via curl.
 
 AI_PROVIDER coverage: provider-independent (CORS is infrastructure-level).
 
-### 10. test_workflow_guard.py (19 tests)
+### 10. test_workflow_guard.py (22 tests)
 
 Covers: UC-12 workflow execution prevention — pattern detection, configurable patterns, HTTP endpoint integration, escalation logging.
 
@@ -187,7 +187,8 @@ Covers: UC-12 workflow execution prevention — pattern detection, configurable 
 |-------|-------|----------|
 | TestWorkflowDetection | 10 | submit/approve/apply/process/enroll detection, case-insensitive, informational queries pass, exception contains pattern |
 | TestWorkflowConfig | 3 | Custom patterns override, empty config uses defaults, pipe-separated patterns |
-| TestWorkflowEndpointIntegration | 6 | Refusal response returned (agent not called), blocked for admin too, informational reaches agent, escalation logged, production regression — intercepted before agent (PROD1), patterns loaded from config (PROD2) |
+| TestWorkflowConfig | 5 | Custom patterns override, empty config uses defaults, pipe-separated patterns (legacy), default patterns non-empty (PROD3), comma-separated env var parsing (PROD5) |
+| TestWorkflowEndpointIntegration | 7 | Refusal response returned (agent not called), blocked for admin too, informational reaches agent, escalation logged, production regression — intercepted before agent (PROD1), patterns loaded from config (PROD2), detection before agent full path (PROD4) |
 
 AI_PROVIDER coverage: provider-independent (workflow guard is pre-agent infrastructure).
 
@@ -285,4 +286,4 @@ cd backend && python3 -m pytest tests/test_document_store.py -v
 
 ## Known Issues
 
-None. All 190 tests pass for both AI_PROVIDER values.
+None. All 193 tests pass for both AI_PROVIDER values.

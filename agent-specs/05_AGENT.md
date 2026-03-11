@@ -799,3 +799,33 @@ No display-friendly document names, no upload dates. Validation gap M1 / UIB-35.
 - `test_extract_sources_enriches_results` (AC5)
 - `test_empty_sources_no_enrichment_call` (AC6)
 - `test_source_doc_new_fields_optional` (AC7)
+
+---
+
+## UC-12 Workflow Prevention — Production Fix (2026-03-11)
+
+### Production incident
+Smoke test: `"submit my leave form now"` hit the RAG pipeline and returned
+`"could not find"` instead of a workflow refusal message.
+
+### Root cause
+UC-12 code did not exist in the deployed build. The previous deploy pre-dated
+commits `2a50c51` and `02ea70e` which added `workflow_guard.py` and wired it
+into `chat_router.py`.
+
+### Investigation results (all 4 passed)
+1. **Call order** — `detect_workflow_attempt()` at `chat_router.py:66-87`,
+   before agent at line 89. Order: JWT → Guardrails → Workflow → Agent. ✅
+2. **Pattern test** — 4 workflow attempts detected, 2 informational queries passed. ✅
+3. **Config load** — `workflow_patterns=''` (empty) triggers default patterns. ✅
+4. **Import check** — `chat_router.py:10` imports from `workflow_guard`. ✅
+
+### Additional fix
+`_get_patterns()` now supports comma-separated `WORKFLOW_PATTERNS` env var
+(standard App Runner format) in addition to legacy pipe-separated format.
+
+### Tests added
+3 production-regression tests in `test_workflow_guard.py`:
+- `test_workflow_patterns_loaded_as_list` (PROD3)
+- `test_workflow_detection_before_agent_full_path` (PROD4)
+- `test_workflow_patterns_parsed_from_comma_string` (PROD5)

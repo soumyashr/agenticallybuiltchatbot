@@ -91,13 +91,38 @@ class TestWorkflowConfig:
             patterns = _get_patterns()
             assert len(patterns) == len(_DEFAULT_PATTERNS)
 
-    # AC: UIB-150 — pipe-separated multiple custom patterns
+    # AC: UIB-150 — pipe-separated multiple custom patterns (legacy)
     def test_pipe_separated_patterns(self):
         custom = r"\brun\b|\bexecute\b"
         with patch("app.workflow_guard.settings") as mock_settings:
             mock_settings.workflow_patterns = custom
             patterns = _get_patterns()
             assert len(patterns) == 2
+
+    # AC: UIB-148-PROD3 — default patterns non-empty and contain key verbs
+    def test_workflow_patterns_loaded_as_list(self):
+        """Default patterns are a non-empty list containing expected verbs."""
+        with patch("app.workflow_guard.settings") as mock_settings:
+            mock_settings.workflow_patterns = ""
+            patterns = _get_patterns()
+        assert isinstance(patterns, list)
+        assert len(patterns) > 0
+        pattern_text = " ".join(p.pattern for p in patterns)
+        for keyword in ["submit", "approve", "enroll"]:
+            assert keyword in pattern_text, f"Missing keyword: {keyword}"
+
+    # AC: UIB-148-PROD5 — comma-separated env var parsed correctly
+    def test_workflow_patterns_parsed_from_comma_string(self):
+        """Simulate WORKFLOW_PATTERNS env var as comma-separated string."""
+        custom = r"\bsubmit\b.*\bform\b, \bapprove\b.*\bmy\b, \bapply\b.*\bnow\b"
+        with patch("app.workflow_guard.settings") as mock_settings:
+            mock_settings.workflow_patterns = custom
+            patterns = _get_patterns()
+        assert len(patterns) == 3
+        # Verify each pattern compiles and matches expected input
+        assert patterns[0].search("submit my form")
+        assert patterns[1].search("approve my request")
+        assert patterns[2].search("apply right now")
 
 
 # ── HTTP endpoint integration ────────────────────────────────
@@ -213,3 +238,23 @@ class TestWorkflowEndpointIntegration:
         pattern_text = " ".join(p.pattern for p in patterns)
         for keyword in ["submit", "approve", "enroll"]:
             assert keyword in pattern_text.lower(), f"Missing keyword: {keyword}"
+
+    # AC: UIB-148-PROD4 — detection fires before agent in endpoint (full path)
+    @patch("app.routers.chat_router.agent_chat")
+    @patch("app.routers.chat_router.save_escalation")
+    def test_workflow_detection_before_agent_full_path(self, mock_esc, mock_agent):
+        """Verify call order: workflow check blocks, agent never invoked, refusal returned."""
+        resp = self.client.post(
+            "/chat",
+            json={"message": "approve my registration", "session_id": "wf-prod4"},
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
+        # Agent must NOT have run
+        mock_agent.assert_not_called()
+        # Must get 200 with refusal (not 400 from guardrails, not 500 from agent)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["sources"] == []
+        assert data["reasoning_steps"] == 0
+        # Escalation must have been logged
+        mock_esc.assert_called_once()

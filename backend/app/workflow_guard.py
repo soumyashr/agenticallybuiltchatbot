@@ -36,11 +36,19 @@ _DEFAULT_PATTERNS: list[str] = [
 
 
 def _get_patterns() -> list[re.Pattern]:
-    """Return compiled regex patterns from config or defaults."""
+    """Return compiled regex patterns from config or defaults.
+
+    WORKFLOW_PATTERNS env var is comma-separated (preferred) or
+    pipe-separated (legacy).  Comma is tried first; if only one part
+    results and it contains a pipe we fall back to pipe-splitting.
+    """
     raw = settings.workflow_patterns
     if raw:
-        # Config value is a pipe-separated string of regex patterns
-        parts = [p.strip() for p in raw.split("|") if p.strip()]
+        # Try comma first (standard env-var list separator)
+        parts = [p.strip() for p in raw.split(",") if p.strip()]
+        # Fallback: if only one part and it contains pipe, split on pipe
+        if len(parts) == 1 and "|" in parts[0]:
+            parts = [p.strip() for p in raw.split("|") if p.strip()]
     else:
         parts = _DEFAULT_PATTERNS
     return [re.compile(p, re.IGNORECASE) for p in parts]

@@ -10,7 +10,8 @@ to `agent.py`. Neutral/fallback responses now return empty sources `[]`.
 
 **Update 2026-03-11:** UC-12 production interception fix applied — `detect_workflow_attempt()`
 correctly wired before agent in chat endpoint. Citation enrichment applied to all code paths
-with consistent filter→enrich order.
+with consistent filter→enrich order. Comma-separated `WORKFLOW_PATTERNS` env var parsing added
+for App Runner compatibility.
 
 ---
 
