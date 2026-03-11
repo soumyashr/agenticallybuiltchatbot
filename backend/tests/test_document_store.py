@@ -33,6 +33,7 @@ def dynamo_env():
 # ═══════════════════════════════════════════════════════════════
 
 class TestInitDB:
+    # AC: UIB-23-GENERAL — DynamoDB table init
     def test_init_creates_table(self, dynamo_env):
         ds = dynamo_env
         import boto3
@@ -40,6 +41,7 @@ class TestInitDB:
         tables = client.list_tables()["TableNames"]
         assert "hm-documents" in tables
 
+    # AC: UIB-23-GENERAL — idempotent init
     def test_init_idempotent(self, dynamo_env):
         ds = dynamo_env
         # calling init_db again should not raise
@@ -51,12 +53,14 @@ class TestInitDB:
 # ═══════════════════════════════════════════════════════════════
 
 class TestRegisterDocument:
+    # AC: UIB-23-GENERAL — document registration returns UUID
     def test_returns_string_id(self, dynamo_env):
         ds = dynamo_env
         doc_id = ds.register_document("a.pdf", "Doc A", ["admin"], 100)
         assert isinstance(doc_id, str)
         assert len(doc_id) == 36  # UUID format
 
+    # AC: UIB-23-GENERAL — registered doc retrievable
     def test_document_retrievable_after_register(self, dynamo_env):
         ds = dynamo_env
         doc_id = ds.register_document("b.pdf", "Doc B", ["admin", "student"], 200)
@@ -70,6 +74,7 @@ class TestRegisterDocument:
         assert doc["file_size"] == 200
         assert doc["chunk_count"] == 0
 
+    # AC: UIB-23-GENERAL — multiple documents registered
     def test_multiple_registers(self, dynamo_env):
         ds = dynamo_env
         ds.register_document("x.pdf", "X", ["admin"], 10)
@@ -83,6 +88,7 @@ class TestRegisterDocument:
 # ═══════════════════════════════════════════════════════════════
 
 class TestGetHelpers:
+    # AC: UIB-23-GENERAL — pending filter
     def test_get_pending_documents(self, dynamo_env):
         ds = dynamo_env
         ds.register_document("a.pdf", "A", ["admin"], 10)
@@ -92,6 +98,7 @@ class TestGetHelpers:
         assert len(pending) == 1
         assert pending[0]["filename"] == "a.pdf"
 
+    # AC: UIB-23-GENERAL — ingested filter
     def test_get_ingested_documents(self, dynamo_env):
         ds = dynamo_env
         d1 = ds.register_document("a.pdf", "A", ["admin"], 10)
@@ -100,6 +107,7 @@ class TestGetHelpers:
         assert len(ingested) == 1
         assert ingested[0]["chunk_count"] == 5
 
+    # AC: UIB-27-GENERAL — role-to-doc mapping
     def test_get_allowed_roles_map(self, dynamo_env):
         ds = dynamo_env
         d1 = ds.register_document("a.pdf", "A", ["admin", "faculty"], 10)
@@ -110,6 +118,7 @@ class TestGetHelpers:
         assert roles_map["a.pdf"] == ["admin", "faculty"]
         assert "b.pdf" not in roles_map
 
+    # AC: UIB-23-GENERAL — sorted by upload date
     def test_get_all_sorted_by_uploaded_at(self, dynamo_env):
         ds = dynamo_env
         ds.register_document("first.pdf", "First", ["admin"], 10)
@@ -125,6 +134,7 @@ class TestGetHelpers:
 # ═══════════════════════════════════════════════════════════════
 
 class TestStatusTransitions:
+    # AC: UIB-23-GENERAL — status transition
     def test_set_status_ingesting(self, dynamo_env):
         ds = dynamo_env
         d = ds.register_document("a.pdf", "A", ["admin"], 10)
@@ -132,6 +142,7 @@ class TestStatusTransitions:
         doc = next(x for x in ds.get_all_documents() if x["id"] == d)
         assert doc["status"] == "INGESTING"
 
+    # AC: UIB-23-GENERAL — status transition
     def test_set_status_ingested(self, dynamo_env):
         ds = dynamo_env
         d = ds.register_document("a.pdf", "A", ["admin"], 10)
@@ -141,6 +152,7 @@ class TestStatusTransitions:
         assert doc["chunk_count"] == 42
         assert doc["ingested_at"] is not None
 
+    # AC: UIB-23-GENERAL — failure status
     def test_set_status_failed(self, dynamo_env):
         ds = dynamo_env
         d = ds.register_document("a.pdf", "A", ["admin"], 10)
@@ -149,6 +161,7 @@ class TestStatusTransitions:
         assert doc["status"] == "FAILED"
         assert doc["error_msg"] == "bad pdf"
 
+    # AC: UIB-23-GENERAL — full document lifecycle
     def test_full_lifecycle(self, dynamo_env):
         ds = dynamo_env
         d = ds.register_document("a.pdf", "A", ["admin"], 10)
@@ -164,6 +177,7 @@ class TestStatusTransitions:
 # ═══════════════════════════════════════════════════════════════
 
 class TestDeleteDocument:
+    # AC: UIB-23-GENERAL — document deletion
     def test_delete_removes_item(self, dynamo_env):
         ds = dynamo_env
         d = ds.register_document("a.pdf", "A", ["admin"], 10)
@@ -171,6 +185,7 @@ class TestDeleteDocument:
         ds.delete_document(d)
         assert len(ds.get_all_documents()) == 0
 
+    # AC: UIB-23-GENERAL — safe no-op deletion
     def test_delete_nonexistent_is_noop(self, dynamo_env):
         ds = dynamo_env
         ds.delete_document("nonexistent-id")  # should not raise

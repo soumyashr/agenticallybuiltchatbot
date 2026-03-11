@@ -1,5 +1,7 @@
 # Validation Gap Analysis
 
+Updated: 2026-03-11 (audit pass #2)
+
 Generated: 2026-03-10
 Source: `docs/Validation of Internal Chatbot Use cases.xlsx`
 
@@ -33,8 +35,8 @@ for App Runner compatibility.
 | M1 | UC-02 | UIB-35 AC1-7 | **Page numbers shown but proper citations not displayed.** Validator: "Page numbers are displayed for all answers, but proper citations are not shown." Citation format missing: high-level location, version/date, deep links. | `agent.py:132` (REACT_TEMPLATE) instructs `Source: [filename], Page: [number]` only. `models.py:29-32` (`SourceDoc`) has only `source`, `page`, `snippet` — no `location`, `version`, `url` fields. `tools.py:36-37` (`_format_docs`) outputs only name + page. | ✅ **FIXED.** `SourceDoc` enriched with `display_name` and `uploaded_at` from DynamoDB metadata. `_enrich_sources()` added to `agent.py`. Frontend updated to show display name and upload date. Deep links remain out of scope (no URL stored per chunk). | Medium |
 | M2 | UC-02 | UIB-31 AC8 | **Responses not organized or summarized; appear as paragraphs.** Validator: "Responses are not organized or summarized; they appear as paragraphs." Also: "For unauthorized queries, a generic message is shown instead of a specific one." | `agent.py:112-150` (REACT_TEMPLATE) — prompt says "summarise it as your Final Answer" but does not instruct structured/bulleted output. No post-processing of LLM output for formatting. | **Partially real.** The LLM is instructed to summarize but not to format with bullets/structure. Prompt tuning needed, not a code bug. | Small |
 | M3 | UC-02 | UIB-23 AC5 | **No audit log for approved document list changes.** Validator: "The approved list of documents change log/analytics is not displayed." | `documents_router.py:104,174-178` — uses `log.info()` to stdout only. `document_store.py:70-89` — no `deleted_by`, `deleted_at`, or audit fields in DynamoDB schema. No separate audit table exists. | **YES — real gap.** Only ephemeral application logs exist; no persistent, queryable audit trail for document CRUD operations. | Medium |
-| M4 | UC-06 (Conversational Context) | UIB-93 AC4-7 | **Context points 4,5,6,7 unverified.** | Point 4: `session_memory_ttl_seconds` env-configurable. Point 5: still plaintext in memory (acceptable for server-side). Point 6: ✅ TTL added — sessions auto-expire. Point 7: sessions now expire, preventing stale cross-device reuse. | ✅ **FIXED (points 4,6,7).** TTL added via `_cleanup_expired_sessions()`. Point 5 (encryption) is an infrastructure concern, not a code bug. | Small |
-| M5 | UC-02 | UIB-18 AC4 | **Session expiry functionality needs verification.** | ✅ Session memory now has TTL synchronized with JWT expiry (8h default). `_cleanup_expired_sessions()` called on every session access. Expired sessions evicted and recreated with fresh memory. | ✅ **FIXED.** `session_memory_ttl_seconds` config + lazy cleanup in `get_or_create_session()`. | Small |
+| M4 | UC-06 (Conversational Context) | UIB-93 AC4-7 | **Context points 4,5,6,7 unverified.** | Point 4: `session_memory_ttl_seconds` env-configurable. Point 5: still plaintext in memory (acceptable for server-side). Point 6: ✅ TTL added — sessions auto-expire. Point 7: sessions now expire, preventing stale cross-device reuse. | ✅ **FIXED — session TTL tests added (UIB-103, UIB-109).** TTL added via `_cleanup_expired_sessions()`. Point 5 (encryption) is an infrastructure concern, not a code bug. | Small |
+| M5 | UC-02 | UIB-18 AC4 | **Session expiry functionality needs verification.** | ✅ Session memory now has TTL synchronized with JWT expiry (8h default). `_cleanup_expired_sessions()` called on every session access. Expired sessions evicted and recreated with fresh memory. | ✅ **FIXED.** `session_memory_ttl_seconds` config + lazy cleanup in `get_or_create_session()`. Tests added: UIB-103-GENERAL, UIB-109-GENERAL. | Small |
 | M6 | UC-02 | UIB-23 AC6 | **Outage/error fallback needs validation.** Validator: "Needs validation under technical issue or outage conditions." | `agent.py:389-457` — retry loop (3 attempts). `agent.py:260-334` — `_direct_faiss_search()` fallback. `agent.py:321-326` — fallback synthesis error returns safe message. `tools.py:60-62` — no-index returns "No documents have been ingested." | **Already handled (partially).** Retry + fallback exists. But no explicit "knowledge sources unavailable" message as UIB-23 AC6 requires ("I'm unable to access internal knowledge sources right now"). Current fallback says "I could not find information..." which is ambiguous. | Small |
 | M7 | UC-03 | UIB-48 | **Safe next steps suggestions — needs verification.** | Not implemented. No configurable suggestion system exists. The fallback message is static: "I could not find information on this topic in the documents accessible to you." No role-specific suggestions (e.g., "Contact student support"). | **Real gap.** UIB-48 requires optional, configurable next-step suggestions when no authorized content found. Not implemented at all. | Medium |
 | M8 | UC-03 | UIB-52 | **Do not reveal restricted titles/snippets — needs verification.** | Same root cause as C1/C3/C4. Search filtering works (`tools.py:75-90`), but no post-generation redaction of restricted doc names from LLM output text or source citations. | ✅ **FIXED.** `_filter_sources_by_role()` now provides defense-in-depth at citation layer. Same fix as C1. | Medium |
@@ -107,3 +109,24 @@ for App Runner compatibility.
    - Add TTL to `_sessions` dict (e.g., `cachetools.TTLCache`)
    - Align session lifetime with JWT expiry
    - Effort: Small (~2 hours)
+
+---
+
+## Audit Pass #2 — 2026-03-11
+
+### Test Coverage Gaps Fixed
+- UC-06/UIB-98: Session clear/reset — 3 new tests added
+- UC-07/UIB-103: Session expiry context clear — 2 new tests added
+- UC-07/UIB-109: Fresh session on new start — 2 new tests added
+- UC-08/UIB-113,117: Ambiguous query clarification — 3 new tests (prompt verification)
+- UC-09/UIB-123,126: Fallback response — 2 additional tests
+- UC-13/UIB-157,161: Irrelevant query handling — 3 new tests (prompt verification)
+- 28 previously untagged tests now have AC references
+- Total tests: 210 (was 193), all passing
+
+### Remaining Gaps (unchanged)
+- M2: Response organization/summarization — prompt tuning needed
+- M3: Audit log for document changes — not implemented
+- M6: Outage/error fallback — partially handled
+- M7: Safe next steps (UIB-48) — not implemented
+- M9-M13: UC-16 Admin Console gaps — blocked on UC-16

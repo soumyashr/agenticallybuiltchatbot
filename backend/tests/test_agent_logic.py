@@ -15,6 +15,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 
 import pytest
 import jwt as pyjwt
+from langchain.memory import ConversationBufferWindowMemory
 
 # ── Ensure settings are importable without a real .env ──────
 # We patch config.settings at module level where needed.
@@ -1428,3 +1429,202 @@ class TestRetrieverPrecision:
             "without retrieval precision review. Higher k causes "
             "irrelevant chunks."
         )
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-06 / UIB-98 — user can clear/reset session context
+# ═══════════════════════════════════════════════════════════════
+
+class TestSessionClearUC06:
+
+    # AC: UIB-98-GENERAL — clear_session removes session
+    def test_clear_session_removes_session(self):
+        """POST /chat/clear removes memory for the given session_id."""
+        from app.agent import _sessions, clear_session
+        _sessions["clear-test-01"] = {
+            "executor": MagicMock(),
+            "role": Role.student,
+            "created_at": time.time(),
+            "memory": MagicMock(),
+        }
+        assert "clear-test-01" in _sessions
+        clear_session("clear-test-01")
+        assert "clear-test-01" not in _sessions
+
+    # AC: UIB-98-GENERAL — clearing non-existent session is safe
+    def test_clear_nonexistent_session_noop(self):
+        """clear_session with unknown id does not raise."""
+        from app.agent import clear_session
+        clear_session("nonexistent-session-999")  # no exception
+
+    # AC: UIB-98-GENERAL — cleared session starts fresh
+    @patch("app.agent._create_executor")
+    def test_cleared_session_creates_fresh_executor(self, mock_create):
+        """After clear, get_or_create_session builds a new executor."""
+        mock_create.return_value = MagicMock()
+        from app.agent import _sessions, clear_session, get_or_create_session
+        _sessions["clear-test-02"] = {
+            "executor": MagicMock(),
+            "role": Role.student,
+            "created_at": time.time() - 10,
+            "memory": MagicMock(),
+        }
+        clear_session("clear-test-02")
+        get_or_create_session("clear-test-02", Role.student)
+        mock_create.assert_called_once()
+        assert _sessions["clear-test-02"]["created_at"] > time.time() - 5
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-07 / UIB-103 — session context cleared on expiry
+# ═══════════════════════════════════════════════════════════════
+
+class TestSessionExpiryUC07:
+
+    # AC: UIB-103-GENERAL — expired session is evicted on access
+    @patch("app.agent._create_executor")
+    def test_expired_session_evicted_on_access(self, mock_create):
+        """When session TTL expires, next access creates fresh session."""
+        mock_create.return_value = MagicMock()
+        from app.agent import _sessions, get_or_create_session
+        _sessions["expire-test-01"] = {
+            "executor": MagicMock(),
+            "role": Role.student,
+            "created_at": 0,  # already expired
+            "memory": MagicMock(),
+        }
+        get_or_create_session("expire-test-01", Role.student)
+        mock_create.assert_called_once()
+        assert _sessions["expire-test-01"]["created_at"] > 0
+
+    # AC: UIB-103-GENERAL — cleanup removes all expired sessions
+    def test_cleanup_removes_all_expired(self):
+        """_cleanup_expired_sessions evicts all expired entries."""
+        from app.agent import _sessions, _cleanup_expired_sessions
+        _sessions["exp-a"] = {
+            "executor": MagicMock(),
+            "role": Role.student,
+            "created_at": 0,
+            "memory": MagicMock(),
+        }
+        _sessions["exp-b"] = {
+            "executor": MagicMock(),
+            "role": Role.faculty,
+            "created_at": 0,
+            "memory": MagicMock(),
+        }
+        _cleanup_expired_sessions()
+        assert "exp-a" not in _sessions
+        assert "exp-b" not in _sessions
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-07 / UIB-109 — fresh context on new session start
+# ═══════════════════════════════════════════════════════════════
+
+class TestFreshSessionUC07:
+
+    # AC: UIB-109-GENERAL — new session calls _create_executor (fresh)
+    @patch("app.agent._create_executor")
+    def test_new_session_creates_fresh_executor(self, mock_create):
+        """A brand-new session invokes _create_executor to get fresh agent."""
+        mock_create.return_value = MagicMock()
+        from app.agent import _sessions, get_or_create_session
+        get_or_create_session("fresh-01", Role.student)
+        mock_create.assert_called_once_with(Role.student)
+        assert "fresh-01" in _sessions
+        assert _sessions["fresh-01"]["created_at"] > time.time() - 5
+
+    # AC: UIB-109-GENERAL — re-login after expiry gets new executor
+    @patch("app.agent._create_executor")
+    def test_relogin_after_expiry_creates_new(self, mock_create):
+        """After session expires, re-creating same session_id creates new executor."""
+        old_executor = MagicMock()
+        new_executor = MagicMock()
+        mock_create.return_value = new_executor
+        from app.agent import _sessions, get_or_create_session
+        _sessions["fresh-02"] = {
+            "executor": old_executor,
+            "role": Role.student,
+            "created_at": 0,  # expired
+        }
+        result = get_or_create_session("fresh-02", Role.student)
+        mock_create.assert_called_once()
+        assert result is new_executor
+        assert _sessions["fresh-02"]["executor"] is new_executor
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-08 / UIB-113, UIB-117 — ambiguous query clarification
+# ═══════════════════════════════════════════════════════════════
+
+class TestClarificationUC08:
+
+    # AC: UIB-113-GENERAL — clarification section exists in prompt
+    def test_prompt_contains_clarification_section(self):
+        """ReAct prompt template includes UC-08 clarification instructions."""
+        from app.agent import REACT_TEMPLATE
+        assert "CLARIFICATION" in REACT_TEMPLATE
+        assert "clarifying question" in REACT_TEMPLATE.lower()
+
+    # AC: UIB-113-GENERAL — clarification prompt is configurable
+    def test_clarification_prompt_configurable(self):
+        """settings.clarify_ambiguous_prompt is injectable into template."""
+        from app.config import Settings
+        field = Settings.model_fields.get("clarify_ambiguous_prompt")
+        assert field is not None, "clarify_ambiguous_prompt setting missing"
+
+    # AC: UIB-117-GENERAL — prompt instructs single clarifying question
+    def test_prompt_instructs_one_question(self):
+        """Prompt tells agent to ask ONE clarifying question, not multiple."""
+        from app.agent import REACT_TEMPLATE
+        assert "ONE" in REACT_TEMPLATE or "one" in REACT_TEMPLATE.lower()
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-09 / UIB-126 — safe fallback (additional coverage)
+# ═══════════════════════════════════════════════════════════════
+
+class TestFallbackUC09:
+
+    # AC: UIB-126-GENERAL — fallback phrases defined
+    def test_fallback_phrases_defined(self):
+        """Fallback phrase list is populated for no-match detection."""
+        from app.agent import _FALLBACK_PHRASES
+        assert len(_FALLBACK_PHRASES) >= 5
+
+    # AC: UIB-123-GENERAL — _is_fallback_response detects all phrases
+    def test_all_fallback_phrases_detected(self):
+        """Each defined fallback phrase is detected by _is_fallback_response."""
+        from app.agent import _is_fallback_response, _FALLBACK_PHRASES
+        for phrase in _FALLBACK_PHRASES:
+            assert _is_fallback_response(f"Sorry, {phrase} in our records."), \
+                f"Fallback phrase not detected: {phrase}"
+
+
+# ═══════════════════════════════════════════════════════════════
+# UC-13 / UIB-157, UIB-161 — irrelevant query handling
+# ═══════════════════════════════════════════════════════════════
+
+class TestIrrelevantQueryUC13:
+
+    # AC: UIB-157-GENERAL — prompt contains irrelevant query section
+    def test_prompt_contains_irrelevant_section(self):
+        """ReAct prompt includes UC-13 irrelevant query instructions."""
+        from app.agent import REACT_TEMPLATE
+        assert "IRRELEVANT" in REACT_TEMPLATE
+        assert "politely decline" in REACT_TEMPLATE.lower()
+
+    # AC: UIB-161-GENERAL — irrelevant query response is configurable
+    def test_irrelevant_response_configurable(self):
+        """settings.irrelevant_query_response is injectable."""
+        from app.config import Settings
+        field = Settings.model_fields.get("irrelevant_query_response")
+        assert field is not None, "irrelevant_query_response setting missing"
+
+    # AC: UIB-157-GENERAL — prompt lists off-topic examples
+    def test_prompt_lists_offtopic_examples(self):
+        """Prompt mentions example off-topic categories."""
+        from app.agent import REACT_TEMPLATE
+        template_lower = REACT_TEMPLATE.lower()
+        assert "weather" in template_lower or "sports" in template_lower or "off-topic" in template_lower

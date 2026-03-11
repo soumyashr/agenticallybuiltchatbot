@@ -59,9 +59,11 @@ class TestWorkflowDetection:
         # Should not raise — asking about a form, not submitting
         detect_workflow_attempt("What is the leave form?")
 
+    # AC: UIB-148-AC3 — general question not blocked
     def test_general_question_passes(self):
         detect_workflow_attempt("How do I find the admission policy?")
 
+    # AC: UIB-148-AC3 — form guidance query not blocked
     def test_form_guidance_not_blocked(self):
         detect_workflow_attempt("Where can I download the leave form?")
 

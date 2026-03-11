@@ -1,6 +1,6 @@
 # Jira Story Tracker
 
-Last Updated: 2026-03-11
+Last Updated: 2026-03-11 (audit pass #2)
 
 ## Tracking Rules
 
@@ -19,11 +19,11 @@ Last Updated: 2026-03-11
 | UC-01 | UIB-2 | UIB-10 | Determine user persona from authentication context | 0 | 0 | ✅ Done |
 | UC-01 | UIB-2 | UIB-14 | Start chatbot interaction on user trigger | 0 | 0 | ✅ Done |
 | UC-02 | UIB-22 | UIB-18 | Submit a natural-language query | 0 | 7 | ✅ Done |
-| UC-02 | UIB-22 | UIB-23 | Retrieve from approved knowledge sources only | 0 | 1 | ✅ Done |
+| UC-02 | UIB-22 | UIB-23 | Retrieve from approved knowledge sources only | 0 | 14 | ✅ Done |
 | UC-02 | UIB-22 | UIB-27 | Apply role/group-based permissions to filter results | 0 | 9 | ✅ Done |
 | UC-02 | UIB-22 | UIB-31 | Generate response using only authorized content | 0 | 1 | ✅ Done |
 | UC-02 | UIB-22 | UIB-35 | Provide citations and links only to authorized documents | 0 | 16 | ✅ Done |
-| UC-03 | UIB-39 | UIB-40 | Filter to authorized documents only | 0 | 1 | ✅ Done |
+| UC-03 | UIB-39 | UIB-40 | Filter to authorized documents only | 0 | 3 | ✅ Done |
 | UC-03 | UIB-39 | UIB-44 | Neutral response when only restricted documents match | 0 | 1 | ✅ Done |
 | UC-03 | UIB-39 | UIB-48 | Suggest safe next steps (optional, configurable) | 0 | 0 | ❌ Pending |
 | UC-03 | UIB-39 | UIB-52 | Do not reveal restricted titles, locations, snippets, or existence | 0 | 2 | ✅ Done |
@@ -36,21 +36,21 @@ Last Updated: 2026-03-11
 | UC-05 | UIB-74 | UIB-83 | Cite multiple sources where applicable | 0 | 1 | ⚠️ Partial |
 | UC-05 | UIB-74 | UIB-88 | Help users when many documents are relevant | 0 | 0 | ❌ Pending |
 | UC-06 | UIB-92 | UIB-93 | Maintain context within an active session | 0 | 6 | ✅ Done |
-| UC-06 | UIB-92 | UIB-98 | Allow user to clear or reset context within a session | 0 | 0 | ✅ Done |
-| UC-07 | UIB-102 | UIB-103 | Clear context when session expires or user logs out | 0 | 0 | ✅ Done |
-| UC-07 | UIB-102 | UIB-109 | Start fresh context on new session start | 0 | 0 | ✅ Done |
-| UC-08 | UIB-108 | UIB-113 | Detect ambiguous or overly broad queries | 0 | 0 | ⚠️ Partial |
-| UC-08 | UIB-108 | UIB-117 | Ask user for clarification before answering | 0 | 0 | ⚠️ Partial |
+| UC-06 | UIB-92 | UIB-98 | Allow user to clear or reset context within a session | 0 | 3 | ✅ Done |
+| UC-07 | UIB-102 | UIB-103 | Clear context when session expires or user logs out | 0 | 2 | ✅ Done |
+| UC-07 | UIB-102 | UIB-109 | Start fresh context on new session start | 0 | 2 | ✅ Done |
+| UC-08 | UIB-108 | UIB-113 | Detect ambiguous or overly broad queries | 0 | 2 | ⚠️ Partial |
+| UC-08 | UIB-108 | UIB-117 | Ask user for clarification before answering | 0 | 1 | ⚠️ Partial |
 | UC-09 | UIB-122 | UIB-123 | Detect when no matching or authorized content exists | 0 | 7 | ✅ Done |
-| UC-09 | UIB-122 | UIB-126 | Return safe fallback instead of speculative answer | 0 | 2 | ✅ Done |
+| UC-09 | UIB-122 | UIB-126 | Return safe fallback instead of speculative answer | 0 | 4 | ✅ Done |
 | UC-10 | UIB-130 | UIB-131 | Detect and log unanswered queries with metadata | 0 | 4 | ✅ Done |
 | UC-10 | UIB-130 | UIB-135 | Route unanswered queries to designated university teams | 0 | 6 | ✅ Done |
 | UC-11 | UIB-139 | UIB-140 | Answer questions about form purpose and usage | 6 | 6 | ✅ Done |
 | UC-11 | UIB-139 | UIB-143 | Guide users on where to find forms | 6 | 5 | ⚠️ Partial |
 | UC-12 | UIB-147 | UIB-148 | Detect workflow-execution attempts | 0 | 14 | ✅ Done |
 | UC-12 | UIB-147 | UIB-152 | Inform users that workflow execution is not supported | 0 | 3 | ✅ Done |
-| UC-13 | UIB-156 | UIB-157 | Detect irrelevant or out-of-scope queries | 0 | 0 | ✅ Done |
-| UC-13 | UIB-156 | UIB-161 | Provide polite decline and scope guidance | 0 | 0 | ✅ Done |
+| UC-13 | UIB-156 | UIB-157 | Detect irrelevant or out-of-scope queries | 0 | 2 | ✅ Done |
+| UC-13 | UIB-156 | UIB-161 | Provide polite decline and scope guidance | 0 | 1 | ✅ Done |
 | UC-14 | UIB-165 | UIB-166 | Detect abusive or harmful queries | 0 | 14 | ✅ Done |
 | UC-14 | UIB-165 | UIB-170 | Block or safely respond according to policy | 0 | 12 | ✅ Done |
 | UC-14 | UIB-165 | UIB-174 | Log and optionally escalate security events | 0 | 1 | ✅ Done |
@@ -79,9 +79,12 @@ Last Updated: 2026-03-11
 
 ## Notes
 
-- **Tests** column = count of `# AC: UIB-XXX` tags found by `grep -rn` in `backend/tests/` (2026-03-11 post-tagging audit)
-- **Additional 15 tests** tagged `# AC: INFRA` for provider switching (not story-specific)
-- **Total tagged tests across all stories:** 137 (+ 15 INFRA = 152 tags across 193 tests)
+- **Tests** column = count of `# AC: UIB-XXX` tags found by `grep -rn` in `backend/tests/` (2026-03-11 audit pass #2)
+- **Additional 24 tests** tagged `# AC: INFRA` for provider switching, Azure integration, and config (not story-specific)
+- **Total tagged tests across all stories:** 181 (+ 24 INFRA = 205 tags across 210 tests)
+- **5 tests** remain untagged (binary file match or edge cases)
 - **UC-17 through UC-19** are additional epics beyond original UC-01 to UC-16 scope
-- **UIB-3** upgraded from Pending → Partial: JWT auth exists with 4 test tags, but no true SSO/SAML integration
-- Status re-derived from actual code evidence on 2026-03-11 — post test-tagging session
+- **UIB-3** — JWT auth exists with 4 test tags, but no true SSO/SAML integration
+- **Jira status** — ALL stories are "Backlog" in Jira; status here derived from code evidence
+- Status re-derived from actual code evidence on 2026-03-11 — full audit pass
+- **Pre-existing 7 test failures**: all resolved (transient due to stale users.db)

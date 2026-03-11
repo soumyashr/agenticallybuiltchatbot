@@ -1,6 +1,6 @@
 # Test Record — Happiest Minds Knowledge Hub
 
-**Date:** 2026-03-10
+**Date:** 2026-03-11 (audit pass #2)
 **Codebase:** /Users/soumya.shrivastava/AgenticallyBuiltChatBot
 
 ---
@@ -9,8 +9,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 193 |
-| Pass | 193 |
+| Total tests | 210 |
+| Pass | 210 |
 | Fail | 0 |
 | Test files | 10 |
 | Python | 3.11.9 |
@@ -20,17 +20,18 @@ Both provider configurations tested:
 
 | Provider | Tests | Passed | Failed |
 |----------|-------|--------|--------|
-| AI_PROVIDER=openai | 193 | 193 | 0 |
-| AI_PROVIDER=azure_openai | 193 | 193 | 0 |
+| AI_PROVIDER=openai | 210 | 210 | 0 |
+| AI_PROVIDER=azure_openai | 210 | 210 | 0 |
 
 ---
 
 ## Test Files
 
-### 1. test_agent_logic.py (76 tests)
+### 1. test_agent_logic.py (~87 tests, includes new UC-06/07/08/09/13 tests)
 
 Covers: agent retry logic, RBAC filtering, document ingest, chat endpoint,
-GET /documents/my sidebar endpoint.
+GET /documents/my sidebar endpoint, session management, clarification, fallback,
+irrelevant query handling.
 
 | Class | Tests | Coverage |
 |-------|-------|----------|
@@ -54,6 +55,12 @@ AC tags used: `# AC: UIB-140-AC1` through `# AC: UIB-140-AC6`,
 | TestRBACCitationFilter | 6 | RBAC citation filter: UIB-31 (role filtering), UIB-35 (no restricted docs), UIB-44 (neutral=empty sources), UIB-40 (fallback=empty), UIB-52 (admin sees all), regression guard |
 | TestSessionTTLUC07 | 6 | Session TTL: expired eviction, valid preservation, explicit clear, TTL configurable, no cross-session leak, fresh context after expiry |
 | TestCitationFormatUC02 | 9 | Citation format enrichment: display_name populated, uploaded_at populated, unknown file stays raw, metadata error returns raw, extract+enrich pipeline, empty sources no call, SourceDoc new fields optional, faculty role enrichment (PROD1), all-paths consistency (PROD2) |
+| TestSessionClearUC06 | 3 | UC-06 clear/reset context: UIB-98 AC tags |
+| TestSessionExpiryUC07 | 2 | UC-07 session expiry: UIB-103 AC tags |
+| TestFreshSessionUC07 | 2 | UC-07 fresh session: UIB-109 AC tags |
+| TestClarificationUC08 | 3 | UC-08 clarification prompt: UIB-113/117 AC tags |
+| TestFallbackUC09 | 2 | UC-09 fallback phrases: UIB-123/126 AC tags |
+| TestIrrelevantQueryUC13 | 3 | UC-13 irrelevant query: UIB-157/161 AC tags |
 
 AI_PROVIDER coverage: provider-agnostic (mocks LLM/tools at function level).
 
@@ -284,6 +291,23 @@ cd backend && python3 -m pytest tests/test_document_store.py -v
 
 ---
 
+## New Tests Added (2026-03-11 session)
+
+| Class | Tests | AC Tags | Description |
+|-------|-------|---------|-------------|
+| TestSessionClearUC06 | 3 | UIB-98 | Clear/reset context |
+| TestSessionExpiryUC07 | 2 | UIB-103 | Session expiry |
+| TestFreshSessionUC07 | 2 | UIB-109 | Fresh session |
+| TestClarificationUC08 | 3 | UIB-113/117 | Clarification prompt |
+| TestFallbackUC09 | 2 | UIB-123/126 | Fallback phrases |
+| TestIrrelevantQueryUC13 | 3 | UIB-157/161 | Irrelevant query |
+
+**Tagging audit:** 28 previously untagged tests were tagged with AC references. All tests now have `# AC:` tags.
+
+**Note:** Per-file test counts are approximate based on AC tags. Total of 210 confirmed via pytest.
+
+---
+
 ## Known Issues
 
-None. All 193 tests pass for both AI_PROVIDER values.
+None. All 210 tests pass for both AI_PROVIDER values.

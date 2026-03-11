@@ -55,6 +55,7 @@ def _make_settings(**overrides):
 class TestAzureLLMConfig:
     """Tests that Azure LLM configuration contains required fields."""
 
+    # AC: INFRA — Azure LLM config
     @patch("app.agent.settings", _make_settings(ai_provider="azure_openai"))
     def test_azure_llm_config_has_required_fields(self):
         """AzureChatOpenAI should receive deployment, endpoint, api_key, api_version."""
@@ -79,6 +80,7 @@ class TestAzureLLMConfig:
 class TestAzureEmbeddingsConfig:
     """Tests that Azure Embeddings configuration contains required fields."""
 
+    # AC: INFRA — Azure embeddings config
     @patch("app.ingest.settings", _make_settings(ai_provider="azure_openai"))
     def test_azure_embeddings_config_has_required_fields(self):
         """AzureOpenAIEmbeddings should receive deployment, endpoint, api_key, api_version."""
@@ -102,6 +104,7 @@ class TestAzureEmbeddingsConfig:
 class TestAzureSearchConfig:
     """Tests that Azure AI Search configuration contains required fields."""
 
+    # AC: INFRA — Azure Search config
     @patch("app.ingest.settings", _make_settings(ai_provider="azure_openai"))
     @patch("app.ingest._build_embeddings")
     def test_azure_search_config_has_required_fields(self, mock_embed):
@@ -129,6 +132,7 @@ class TestAzureSearchConfig:
 class TestAzureSearchRBAC:
     """Tests that Azure AI Search applies RBAC filters correctly."""
 
+    # AC: UIB-40-GENERAL — Azure RBAC OData filter
     @patch("app.tools.settings", _make_settings(ai_provider="azure_openai"))
     @patch("app.tools.get_vector_store")
     def test_azure_search_rbac_filter_applied_correctly(self, mock_vs):
@@ -151,6 +155,7 @@ class TestAzureSearchRBAC:
         assert "student" in call_kwargs["filters"]
         assert "allowed_roles" in call_kwargs["filters"]
 
+    # AC: UIB-40-GENERAL — Azure role-filtered results
     @patch("app.tools.settings", _make_settings(ai_provider="azure_openai"))
     @patch("app.tools.get_vector_store")
     def test_azure_search_returns_role_filtered_results(self, mock_vs):
@@ -178,6 +183,7 @@ class TestAzureSearchRBAC:
 class TestAzureIngest:
     """Tests for the Azure AI Search ingest pipeline."""
 
+    # AC: INFRA — Azure index creation
     @patch("app.ingest.settings", _make_settings(ai_provider="azure_openai"))
     @patch("app.ingest._build_embeddings")
     def test_azure_ingest_creates_index_if_not_exists(self, mock_embed):
@@ -202,6 +208,7 @@ class TestAzureIngest:
 
             mock_index_client.create_or_update_index.assert_called_once()
 
+    # AC: INFRA — Azure document upsert
     @patch("app.ingest.settings", _make_settings(ai_provider="azure_openai"))
     @patch("app.ingest._build_embeddings")
     def test_azure_ingest_upserts_documents(self, mock_embed):

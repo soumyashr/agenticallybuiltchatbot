@@ -18,6 +18,7 @@ from unittest.mock import patch
 class TestAIProviderDefaults:
     """Tests for AI_PROVIDER default value and env var reading."""
 
+    # AC: INFRA — default provider
     def test_ai_provider_defaults_to_azure_openai(self):
         """The default value for ai_provider should be 'azure_openai'."""
         from app.config import Settings
@@ -26,6 +27,7 @@ class TestAIProviderDefaults:
             s = Settings(_env_file=None)
             assert s.ai_provider == "azure_openai"
 
+    # AC: INFRA — Azure env fields
     @patch.dict("os.environ", {
         "AI_PROVIDER": "openai",
         "AZURE_OPENAI_API_KEY": "test-key",
@@ -49,6 +51,7 @@ class TestAIProviderDefaults:
 class TestAzureValidation:
     """Tests that missing Azure config raises appropriate errors at build time."""
 
+    # AC: INFRA — Azure key validation
     @patch.dict("os.environ", {"AI_PROVIDER": "azure_openai"}, clear=False)
     def test_missing_azure_key_raises_on_build(self):
         """When AI_PROVIDER=azure_openai and azure_openai_api_key is empty,
@@ -60,6 +63,7 @@ class TestAzureValidation:
         assert s.ai_provider == "azure_openai"
         assert s.azure_openai_api_key == ""  # empty but no crash at config level
 
+    # AC: INFRA — Azure endpoint validation
     @patch.dict("os.environ", {"AI_PROVIDER": "azure_openai"}, clear=False)
     def test_missing_azure_endpoint_raises_on_build(self):
         """When AI_PROVIDER=azure_openai and azure_openai_endpoint is empty,
