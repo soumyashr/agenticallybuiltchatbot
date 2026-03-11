@@ -65,6 +65,7 @@ def _make_settings(**overrides):
 class TestProviderLLM:
     """Tests that _build_llm() returns the correct LLM type per provider."""
 
+    # AC: INFRA — OpenAI LLM instantiation
     @patch("app.agent.settings", _make_settings(ai_provider="openai"))
     def test_openai_provider_builds_correct_llm_type(self):
         """When AI_PROVIDER=openai, _build_llm() returns a ChatOpenAI instance."""
@@ -76,6 +77,7 @@ class TestProviderLLM:
             call_kwargs = MockChatOpenAI.call_args[1]
             assert call_kwargs["openai_api_key"] == "sk-test-key"
 
+    # AC: INFRA — Azure LLM instantiation
     @patch("app.agent.settings", _make_settings(ai_provider="azure_openai"))
     def test_azure_provider_builds_correct_llm_type(self):
         """When AI_PROVIDER=azure_openai, _build_llm() returns an AzureChatOpenAI instance."""
@@ -88,6 +90,7 @@ class TestProviderLLM:
             assert call_kwargs["azure_deployment"] == "gpt-4o"
             assert call_kwargs["azure_endpoint"] == "https://test.openai.azure.com/"
 
+    # AC: INFRA — invalid provider rejected
     @patch("app.agent.settings", _make_settings(ai_provider="invalid_provider"))
     def test_invalid_provider_raises_value_error(self):
         """An unknown AI_PROVIDER raises ValueError."""
@@ -104,6 +107,7 @@ class TestProviderLLM:
 class TestProviderEmbeddings:
     """Tests that _build_embeddings() returns the correct type per provider."""
 
+    # AC: INFRA — OpenAI embeddings instantiation
     @patch("app.ingest.settings", _make_settings(ai_provider="openai"))
     def test_openai_provider_builds_openai_embeddings(self):
         """When AI_PROVIDER=openai, _build_embeddings() returns OpenAIEmbeddings."""
@@ -115,6 +119,7 @@ class TestProviderEmbeddings:
             call_kwargs = MockEmbed.call_args[1]
             assert call_kwargs["openai_api_key"] == "sk-test-key"
 
+    # AC: INFRA — Azure embeddings instantiation
     @patch("app.ingest.settings", _make_settings(ai_provider="azure_openai"))
     def test_azure_provider_builds_azure_embeddings(self):
         """When AI_PROVIDER=azure_openai, _build_embeddings() returns AzureOpenAIEmbeddings."""
@@ -135,6 +140,7 @@ class TestProviderEmbeddings:
 class TestProviderVectorStore:
     """Tests that get_vector_store() returns the correct store type per provider."""
 
+    # AC: INFRA — Azure Search store instantiation
     @patch("app.ingest.settings", _make_settings(ai_provider="azure_openai"))
     @patch("app.ingest._build_embeddings")
     def test_azure_provider_builds_azure_search_store(self, mock_embed):
@@ -150,6 +156,7 @@ class TestProviderVectorStore:
             assert call_kwargs["index_name"] == "test-index"
             get_vector_store.cache_clear()
 
+    # AC: INFRA — FAISS store instantiation for openai
     @patch("app.ingest.settings", _make_settings(ai_provider="openai"))
     @patch("app.ingest._build_embeddings")
     @patch("os.path.exists", return_value=True)
@@ -179,6 +186,7 @@ class TestProviderRBAC:
         yield
         _sessions.clear()
 
+    # AC: INFRA — provider switch preserves RBAC
     def test_provider_switch_does_not_affect_rbac(self):
         """Switching providers should not bypass role-based session isolation."""
         with patch("app.agent._create_executor") as mock_create:
@@ -199,6 +207,7 @@ class TestProviderRBAC:
 class TestEnvReading:
     """Tests that the AI_PROVIDER env var is read correctly."""
 
+    # AC: INFRA — AI_PROVIDER env var read correctly
     @patch.dict("os.environ", {"AI_PROVIDER": "openai"}, clear=False)
     def test_env_flag_ai_provider_is_read_correctly(self):
         """AI_PROVIDER env var should be accessible via Settings."""
@@ -207,6 +216,7 @@ class TestEnvReading:
         s = Settings()
         assert s.ai_provider == "openai"
 
+    # AC: INFRA — Azure provider env var
     @patch.dict("os.environ", {"AI_PROVIDER": "azure_openai"}, clear=False)
     def test_env_flag_azure_provider(self):
         """AI_PROVIDER=azure_openai should be read correctly."""
@@ -223,6 +233,7 @@ class TestEnvReading:
 class TestOpenAIProviderUsesCorrectStack:
     """Verify that AI_PROVIDER=openai never touches Azure services."""
 
+    # AC: INFRA — openai provider uses FAISS not Azure
     @patch("app.ingest.settings", _make_settings(ai_provider="openai"))
     @patch("app.ingest._build_embeddings")
     @patch("os.path.exists", return_value=True)
@@ -239,6 +250,7 @@ class TestOpenAIProviderUsesCorrectStack:
             MockAzSearch.assert_not_called()
             get_vector_store.cache_clear()
 
+    # AC: INFRA — openai uses OpenAI embeddings not Azure
     @patch("app.ingest.settings", _make_settings(ai_provider="openai"))
     def test_openai_provider_uses_openai_embeddings_not_azure(self):
         """When AI_PROVIDER=openai, _build_embeddings() uses OpenAIEmbeddings, not Azure."""
@@ -259,6 +271,7 @@ class TestOpenAIProviderUsesCorrectStack:
 class TestProviderDocumentStoreIndependence:
     """DynamoDB document_store works regardless of AI_PROVIDER value."""
 
+    # AC: INFRA — DynamoDB works regardless of provider
     def test_switching_provider_does_not_break_document_store(self):
         """document_store functions work with AI_PROVIDER=openai."""
         with mock_aws():
@@ -271,6 +284,7 @@ class TestProviderDocumentStoreIndependence:
             assert docs[0]["id"] == doc_id
             ds._table = None
 
+    # AC: INFRA — DynamoDB CRUD with openai provider
     @patch.dict("os.environ", {"AI_PROVIDER": "openai"}, clear=False)
     def test_dynamo_works_regardless_of_ai_provider(self):
         """DynamoDB operations succeed with AI_PROVIDER=openai (not azure_openai)."""

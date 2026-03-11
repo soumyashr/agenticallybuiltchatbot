@@ -46,12 +46,14 @@ def dynamo_env():
 
 
 class TestFeedbackStore:
+    # AC: UIB-179-GENERAL — feedback saved with UUID
     def test_save_returns_uuid(self, dynamo_env):
         fs = dynamo_env
         fid = fs.save_feedback("s1", "query", "response text", "positive", "", "student")
         assert isinstance(fid, str)
         assert len(fid) == 36
 
+    # AC: UIB-179-GENERAL — feedback item structure
     def test_saved_item_has_correct_fields(self, dynamo_env):
         fs = dynamo_env
         fid = fs.save_feedback("s1", "hello?", "The answer is...", "negative", "not helpful", "faculty")
@@ -68,6 +70,7 @@ class TestFeedbackStore:
         assert "timestamp" in item
         assert "created_at" in item
 
+    # AC: UIB-179-GENERAL — feedback retrievable by session
     def test_get_feedback_by_session(self, dynamo_env):
         fs = dynamo_env
         fs.save_feedback("s1", "q1", "r1", "positive", "", "admin")
@@ -76,6 +79,7 @@ class TestFeedbackStore:
         result = fs.get_feedback_by_session("s1")
         assert len(result) == 2
 
+    # AC: UIB-179-GENERAL — response preview truncated
     def test_response_preview_truncated(self, dynamo_env):
         fs = dynamo_env
         long_response = "x" * 500
@@ -83,6 +87,7 @@ class TestFeedbackStore:
         items = fs.get_all_feedback()
         assert len(items[0]["response_preview"]) == 200
 
+    # AC: UIB-183-GENERAL — comment defaults to empty
     def test_comment_default_empty(self, dynamo_env):
         fs = dynamo_env
         fs.save_feedback("s1", "q", "r", "positive", "", "student")
@@ -102,6 +107,7 @@ class TestFeedbackEndpoint:
         from app.main import app
         return TestClient(app)
 
+    # AC: UIB-179-GENERAL — positive rating saved
     def test_save_positive_feedback(self, client, dynamo_env):
         token = _make_token("student")
         resp = client.post("/feedback", json={
@@ -113,6 +119,7 @@ class TestFeedbackEndpoint:
         assert "id" in data
         assert data["status"] == "saved"
 
+    # AC: UIB-179-GENERAL — negative rating saved
     def test_save_negative_feedback(self, client, dynamo_env):
         token = _make_token("faculty")
         resp = client.post("/feedback", json={
@@ -121,6 +128,7 @@ class TestFeedbackEndpoint:
         }, headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 200
 
+    # AC: UIB-179-GENERAL — feedback requires auth
     def test_feedback_requires_auth(self, client):
         resp = client.post("/feedback", json={
             "session_id": "s1", "message": "q",
@@ -128,6 +136,7 @@ class TestFeedbackEndpoint:
         })
         assert resp.status_code == 401
 
+    # AC: UIB-179-GENERAL — invalid rating rejected
     def test_invalid_rating_rejected(self, client, dynamo_env):
         token = _make_token("student")
         resp = client.post("/feedback", json={
@@ -136,6 +145,7 @@ class TestFeedbackEndpoint:
         }, headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 422
 
+    # AC: UIB-179-GENERAL — admin can view all feedback
     def test_admin_can_view_feedback(self, client, dynamo_env):
         fs = dynamo_env
         fs.save_feedback("s1", "q", "r", "positive", "", "admin")
@@ -147,12 +157,14 @@ class TestFeedbackEndpoint:
         assert isinstance(data, list)
         assert len(data) >= 1
 
+    # AC: UIB-179-GENERAL — students cannot view feedback
     def test_student_cannot_view_feedback(self, client, dynamo_env):
         token = _make_token("student")
         resp = client.get("/admin/feedback",
                           headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 403
 
+    # AC: UIB-183-GENERAL — comment is optional
     def test_comment_is_optional(self, client, dynamo_env):
         token = _make_token("student")
         resp = client.post("/feedback", json={

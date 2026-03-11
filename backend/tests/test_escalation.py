@@ -59,12 +59,14 @@ def dynamo_env():
 
 
 class TestEscalationStore:
+    # AC: UIB-131-GENERAL — escalation saved with UUID
     def test_save_returns_uuid(self, dynamo_env):
         es = dynamo_env
         eid = es.save_escalation("s1", "query", "student", "no_answer_found")
         assert isinstance(eid, str)
         assert len(eid) == 36
 
+    # AC: UIB-131-GENERAL — escalation item structure
     def test_saved_item_has_correct_fields(self, dynamo_env):
         es = dynamo_env
         eid = es.save_escalation("s1", "What is X?", "faculty", "agent_parse_failure")
@@ -79,6 +81,7 @@ class TestEscalationStore:
         assert item["notified"] is False
         assert "timestamp" in item
 
+    # AC: UIB-135-GENERAL — escalation marked as notified
     def test_mark_notified(self, dynamo_env):
         es = dynamo_env
         eid = es.save_escalation("s1", "q", "admin", "no_answer_found")
@@ -99,6 +102,7 @@ class TestEscalationLogic:
         yield
         _sessions.clear()
 
+    # AC: UIB-131-GENERAL — escalation on no-answer fallback
     @patch("app.agent._build_llm")
     @patch("app.agent.make_search_tools")
     @patch("app.agent.save_escalation")
@@ -140,6 +144,7 @@ class TestEscalationLogic:
         # Escalation saved at least once (on parse failure path + on exhausted retries)
         assert mock_save_esc.call_count >= 1
 
+    # AC: UIB-131-GENERAL — escalation on agent parse failure
     @patch("app.agent._build_llm")
     @patch("app.agent.make_search_tools")
     @patch("app.agent.save_escalation")
@@ -172,6 +177,7 @@ class TestEscalationLogic:
                    for call in mock_save_esc.call_args_list]
         assert "agent_parse_failure" in reasons
 
+    # AC: UIB-135-GENERAL — Slack notification on escalation
     @patch("app.agent._build_llm")
     @patch("app.agent.make_search_tools")
     @patch("app.agent.save_escalation")
@@ -218,6 +224,7 @@ class TestEscalationLogic:
 
         assert mock_slack.call_count >= 1
 
+    # AC: UIB-135-GENERAL — Slack failure does not break chat
     @patch("app.agent._build_llm")
     @patch("app.agent.make_search_tools")
     @patch("app.agent.save_escalation")
@@ -251,11 +258,13 @@ class TestEscalationLogic:
 
         assert "answer" in result  # Chat still returned a valid result
 
+    # AC: INFRA — httpx dependency available
     def test_httpx_importable(self):
         """Regression test — ensures httpx is available (caused deploy rollback)."""
         import httpx
         assert httpx.__version__ is not None
 
+    # AC: UIB-135-GENERAL — no Slack when webhook not configured
     @patch("app.agent._build_llm")
     @patch("app.agent.make_search_tools")
     @patch("app.agent.save_escalation")
@@ -313,6 +322,7 @@ class TestEscalationEndpoint:
         from app.main import app
         return TestClient(app)
 
+    # AC: UIB-135-GENERAL — admin can view escalations
     def test_admin_can_view_escalations(self, client, dynamo_env):
         es = dynamo_env
         es.save_escalation("s1", "query", "student", "no_answer_found")
@@ -325,6 +335,7 @@ class TestEscalationEndpoint:
         assert len(data) >= 1
         assert data[0]["query"] == "query"
 
+    # AC: UIB-135-GENERAL — students cannot view escalations
     def test_student_cannot_view_escalations(self, client, dynamo_env):
         token = _make_token("student")
         resp = client.get("/admin/escalations",

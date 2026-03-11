@@ -13,6 +13,7 @@ FRONTEND_ORIGIN = "https://gazfq7ai7a.ap-south-1.awsapprunner.com"
 
 class TestCORSHeaders:
 
+    # AC: UIB-1-GENERAL — CORS allows approved frontend origin
     def test_preflight_from_frontend_origin(self):
         """Browser preflight (OPTIONS) from the production frontend must be allowed."""
         resp = client.options(
@@ -24,6 +25,7 @@ class TestCORSHeaders:
         )
         assert resp.headers.get("access-control-allow-origin") == FRONTEND_ORIGIN
 
+    # AC: UIB-1-GENERAL — CORS allows localhost dev origin
     def test_preflight_from_localhost(self):
         """Preflight from localhost dev server must be allowed."""
         resp = client.options(
@@ -35,6 +37,7 @@ class TestCORSHeaders:
         )
         assert resp.headers.get("access-control-allow-origin") == "http://localhost:5173"
 
+    # AC: UIB-1-GENERAL — unknown origin rejected
     def test_cors_rejected_from_unknown_origin(self):
         """Preflight from an unknown origin must NOT echo that origin back."""
         resp = client.options(
@@ -46,6 +49,7 @@ class TestCORSHeaders:
         )
         assert resp.headers.get("access-control-allow-origin") != "https://evil.com"
 
+    # AC: UIB-1-GENERAL — actual request includes CORS header
     def test_actual_request_from_frontend_has_cors_header(self):
         """Actual POST from frontend origin must include CORS header in response."""
         resp = client.post(
@@ -55,6 +59,7 @@ class TestCORSHeaders:
         )
         assert resp.headers.get("access-control-allow-origin") == FRONTEND_ORIGIN
 
+    # AC: UIB-1-GENERAL — config includes frontend URL
     def test_cors_origins_config_contains_frontend_url(self):
         """Config must contain the frontend URL — fails immediately if removed."""
         from app.config import settings

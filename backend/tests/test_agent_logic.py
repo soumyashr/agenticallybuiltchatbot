@@ -69,25 +69,32 @@ def _make_step(observation: str):
 class TestIsFallbackResponse:
     """_is_fallback_response() unit tests."""
 
+    # AC: UIB-122-GENERAL — fallback detection supports UC-09 no-match handling
     def test_clean_answer(self):
         assert _is_fallback_response("The syllabus covers machine learning.") is False
 
+    # AC: UIB-122-GENERAL
     def test_fallback_could_not_find(self):
         assert _is_fallback_response("I could not find information on this topic.") is True
 
+    # AC: UIB-122-GENERAL
     def test_fallback_no_information(self):
         assert _is_fallback_response("No information found in documents.") is True
 
+    # AC: UIB-122-GENERAL
     def test_fallback_parsing_error(self):
         assert _is_fallback_response("There was a parsing error in the response.") is True
 
+    # AC: UIB-122-GENERAL
     def test_fallback_agent_stopped(self):
         assert _is_fallback_response("Agent stopped due to iteration limit.") is True
 
+    # AC: UIB-122-GENERAL
     def test_case_insensitive(self):
         assert _is_fallback_response("I COULD NOT FIND INFORMATION on this.") is True
         assert _is_fallback_response("PARSING ERROR occurred.") is True
 
+    # AC: UIB-122-GENERAL
     def test_partial_word_non_match(self):
         """Words that contain fallback substrings but are valid answers."""
         # "information" alone doesn't trigger — needs the full phrase
@@ -97,17 +104,21 @@ class TestIsFallbackResponse:
 class TestHasSources:
     """_has_sources() unit tests."""
 
+    # AC: UIB-35-GENERAL — source extraction supports citation pipeline
     def test_empty_steps(self):
         assert _has_sources([]) is False
 
+    # AC: UIB-35-GENERAL
     def test_with_source_tag(self):
         steps = [_make_step("[1] Source: syllabus.pdf, Page: 3\nContent here")]
         assert _has_sources(steps) is True
 
+    # AC: UIB-35-GENERAL
     def test_without_source_tag(self):
         steps = [_make_step("No relevant information found.")]
         assert _has_sources(steps) is False
 
+    # AC: UIB-35-GENERAL
     def test_non_string_observation(self):
         steps = [_make_step(12345)]  # non-string
         assert _has_sources(steps) is False
@@ -116,6 +127,7 @@ class TestHasSources:
 class TestExtractSources:
     """_extract_sources() unit tests."""
 
+    # AC: UIB-35-GENERAL — source extraction for citation pipeline
     def test_single_source(self):
         steps = [_make_step("[1] Source: syllabus.pdf, Page: 5\nSome content here")]
         result = _extract_sources(steps)
@@ -123,12 +135,14 @@ class TestExtractSources:
         assert result[0].source == "syllabus.pdf"
         assert result[0].page == 5
 
+    # AC: UIB-35-GENERAL
     def test_dedup(self):
         obs = "[1] Source: syllabus.pdf, Page: 5\nContent\n---\n[2] Source: syllabus.pdf, Page: 5\nDuplicate"
         steps = [_make_step(obs)]
         result = _extract_sources(steps)
         assert len(result) == 1
 
+    # AC: UIB-83-GENERAL — multiple source extraction for multi-doc answers
     def test_multiple_sources(self):
         obs = "[1] Source: doc_a.pdf, Page: 1\nA\n---\n[2] Source: doc_b.pdf, Page: 2\nB"
         steps = [_make_step(obs)]
@@ -137,6 +151,7 @@ class TestExtractSources:
         names = {s.source for s in result}
         assert names == {"doc_a.pdf", "doc_b.pdf"}
 
+    # AC: UIB-126-GENERAL — no sources on no-match
     def test_no_source_tag(self):
         steps = [_make_step("No relevant information found.")]
         result = _extract_sources(steps)
@@ -152,6 +167,7 @@ class TestRetryDecisions:
         yield
         _sessions.clear()
 
+    # AC: UIB-18-GENERAL — agent retry on parse failure
     @patch("app.agent._build_llm")
     @patch("app.agent.make_search_tools")
     def test_fallback_no_faiss_triggers_retry(self, mock_tools, mock_llm):
@@ -187,6 +203,7 @@ class TestRetryDecisions:
         assert result["fallback_used"] is False
         assert "ML topics" in result["answer"]
 
+    # AC: UIB-126-GENERAL — genuine no-match does not retry
     @patch("app.agent._build_llm")
     @patch("app.agent.make_search_tools")
     def test_fallback_with_faiss_no_retry(self, mock_tools, mock_llm):
@@ -220,7 +237,9 @@ class TestRetryDecisions:
 
 
 class TestHardErrorNoRetry:
-    """Auth/rate-limit errors should raise immediately, not retry."""
+    """Auth/rate-limit errors should raise immediately, not retry.
+    # AC: UIB-18-GENERAL — error classification for agent robustness
+    """
 
     @pytest.fixture(autouse=True)
     def cleanup_sessions(self):
@@ -228,6 +247,7 @@ class TestHardErrorNoRetry:
         yield
         _sessions.clear()
 
+    # AC: UIB-18-GENERAL — hard errors not retried
     @pytest.mark.parametrize("error_msg", [
         "401 Unauthorized",
         "invalid_api_key provided",
@@ -257,6 +277,7 @@ class TestHardErrorNoRetry:
 
 class TestSoftErrorRetried:
     """Timeout / generic errors should be retried."""
+    # AC: UIB-18-GENERAL — soft errors retried with fallback
 
     @pytest.fixture(autouse=True)
     def cleanup_sessions(self):
@@ -306,6 +327,7 @@ class TestRBAC:
         yield
         _sessions.clear()
 
+    # AC: UIB-27-GENERAL — RBAC session isolation
     def test_role_mismatch_raises(self):
         """Reusing a session with a different role raises PermissionError."""
         with patch("app.agent._create_executor") as mock_create:
@@ -314,17 +336,20 @@ class TestRBAC:
             with pytest.raises(PermissionError):
                 get_or_create_session("rbac-test-1", Role.student)
 
+    # AC: UIB-3-GENERAL — SSO/JWT token validation
     def test_jwt_decode_valid(self):
         token = _make_token("admin", "admin")
         payload = decode_token(token)
         assert payload["sub"] == "admin"
         assert payload["role"] == "admin"
 
+    # AC: UIB-3-GENERAL — expired JWT rejected
     def test_jwt_expired_raises(self):
         token = _make_token("admin", expired=True)
         with pytest.raises(pyjwt.ExpiredSignatureError):
             decode_token(token)
 
+    # AC: UIB-3-GENERAL — invalid JWT rejected
     def test_jwt_invalid_raises(self):
         with pytest.raises(pyjwt.InvalidTokenError):
             decode_token("not.a.valid.token")
@@ -373,16 +398,19 @@ class TestRBACDocumentFiltering:
             if d["status"] == "INGESTED" and role in d.get("allowed_roles", [])
         ]
 
+    # AC: UIB-27-GENERAL — admin sees all documents
     def test_admin_sees_all(self):
         result = self._filter_for_role("admin")
         assert len(result) == 3
 
+    # AC: UIB-27-GENERAL — faculty sees permitted documents only
     def test_faculty_sees_two(self):
         result = self._filter_for_role("faculty")
         assert len(result) == 2
         names = {d["display_name"] for d in result}
         assert "Admin Protocol" not in names
 
+    # AC: UIB-27-GENERAL — student sees permitted documents only
     def test_student_sees_one(self):
         result = self._filter_for_role("student")
         assert len(result) == 1
@@ -397,6 +425,7 @@ class TestRBACDocumentFiltering:
 class TestDocumentIngest:
     """Tests for document upload and ingest pipeline."""
 
+    # AC: UIB-27-GENERAL — search-layer role filtering
     def test_role_filter_keeps_allowed(self):
         """Verify the role filter logic (unit test of _filter_by_role)."""
         from app.tools import _filter_by_role
@@ -421,6 +450,7 @@ class TestDocumentIngest:
         result = _filter_by_role([doc1, doc2, doc3], "admin")
         assert len(result) == 3
 
+    # AC: UIB-27-GENERAL — JSON string roles parsed correctly
     def test_role_filter_json_string(self):
         """Roles stored as JSON string should be parsed."""
         from app.tools import _filter_by_role
@@ -431,6 +461,7 @@ class TestDocumentIngest:
         result = _filter_by_role([doc], "student")
         assert len(result) == 1
 
+    # AC: UIB-23-GENERAL — graceful handling when no index exists
     @patch("app.tools.get_vector_store")
     def test_search_tool_no_index(self, mock_vs):
         """When no FAISS index exists, search tool returns helpful message."""
@@ -455,10 +486,12 @@ class TestChatEndpoint:
         from app.main import app
         return TestClient(app)
 
+    # AC: UIB-1-GENERAL — unauthenticated access rejected
     def test_missing_token_returns_401(self, client):
         resp = client.post("/chat", json={"message": "hello", "session_id": "s1"})
         assert resp.status_code == 401
 
+    # AC: UIB-3-GENERAL — expired token rejected
     def test_expired_token_returns_401(self, client):
         token = _make_token("student", expired=True)
         resp = client.post(
@@ -468,6 +501,7 @@ class TestChatEndpoint:
         )
         assert resp.status_code == 401
 
+    # AC: UIB-18-GENERAL — valid chat request returns 200
     @patch("app.routers.chat_router.agent_chat", new_callable=AsyncMock)
     def test_valid_token_returns_200(self, mock_chat, client):
         mock_chat.return_value = {
@@ -490,6 +524,7 @@ class TestChatEndpoint:
         assert data["answer"] == "The answer is 42."
         assert data["session_id"] == "s1"
 
+    # AC: UIB-18-GENERAL — LLM error returns 500
     @patch("app.routers.chat_router.agent_chat", new_callable=AsyncMock)
     def test_llm_error_returns_500(self, mock_chat, client):
         mock_chat.side_effect = RuntimeError("LLM crashed")
@@ -518,10 +553,12 @@ class TestDocumentsMyEndpoint:
         from app.main import app
         return TestClient(app)
 
+    # AC: UIB-1-GENERAL — unauthenticated access rejected
     def test_unauthenticated_returns_401(self, client):
         resp = client.get("/documents/my")
         assert resp.status_code == 401
 
+    # AC: UIB-27-GENERAL — admin sees all documents
     @patch("app.routers.documents_router.get_all_documents")
     def test_admin_gets_all(self, mock_docs, client):
         mock_docs.return_value = self.MOCK_DOCS
@@ -534,6 +571,7 @@ class TestDocumentsMyEndpoint:
         data = resp.json()
         assert len(data) == 3
 
+    # AC: UIB-27-GENERAL — faculty role filtering
     @patch("app.routers.documents_router.get_all_documents")
     def test_faculty_gets_two(self, mock_docs, client):
         mock_docs.return_value = self.MOCK_DOCS
@@ -548,6 +586,7 @@ class TestDocumentsMyEndpoint:
         names = {d["display_name"] for d in data}
         assert "Admin Protocol" not in names
 
+    # AC: UIB-27-GENERAL — student role filtering
     @patch("app.routers.documents_router.get_all_documents")
     def test_student_gets_one(self, mock_docs, client):
         mock_docs.return_value = self.MOCK_DOCS
@@ -561,6 +600,7 @@ class TestDocumentsMyEndpoint:
         assert len(data) == 1
         assert data[0]["display_name"] == "CS405 Syllabus"
 
+    # AC: UIB-52-GENERAL — no restricted details leaked in API response
     @patch("app.routers.documents_router.get_all_documents")
     def test_no_file_paths_exposed(self, mock_docs, client):
         """Ensure no filename/filepath fields leak through."""
