@@ -231,7 +231,7 @@ def reindex(admin: dict = Depends(require_admin)):
     the delete-fix was applied.
     WARNING: Index will be briefly empty during rebuild.
     """
-    log.info("Reindex triggered by admin: %s", admin["username"])
+    log.info("Reindex triggered by admin: %s", admin["sub"])
     try:
         result = wipe_and_rebuild_index()
     except Exception as exc:
