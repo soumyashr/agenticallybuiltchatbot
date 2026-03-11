@@ -18,7 +18,7 @@ mkdir -p /Users/soumya.shrivastava/AgenticallyBuiltChatBot/docker
 Write to `docker/Dockerfile.backend`:
 ```dockerfile
 # ── Stage 1: Builder ──────────────────────────────────────────
-FROM --platform=linux/arm64 python:3.11-slim AS builder
+FROM --platform=linux/amd64 python:3.11-slim AS builder
 
 WORKDIR /build
 
@@ -30,7 +30,7 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # ── Stage 2: Runtime ──────────────────────────────────────────
-FROM --platform=linux/arm64 python:3.11-slim
+FROM --platform=linux/amd64 python:3.11-slim
 
 WORKDIR /app
 
@@ -57,7 +57,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 Write to `docker/Dockerfile.frontend`:
 ```dockerfile
 # ── Stage 1: Build ────────────────────────────────────────────
-FROM --platform=linux/arm64 node:20-alpine AS builder
+FROM --platform=linux/amd64 node:20-alpine AS builder
 
 WORKDIR /build
 
@@ -65,10 +65,12 @@ COPY frontend/package*.json ./
 RUN npm ci --silent
 
 COPY frontend/ .
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # ── Stage 2: Serve ────────────────────────────────────────────
-FROM --platform=linux/arm64 nginx:alpine
+FROM --platform=linux/amd64 nginx:alpine
 
 COPY --from=builder /build/dist /usr/share/nginx/html
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
@@ -89,61 +91,26 @@ Write to `docker/nginx.conf`:
 ```nginx
 server {
     listen 80;
-    server_name _;
-
     root /usr/share/nginx/html;
     index index.html;
 
-    # API proxy → backend
-    location /auth/ {
-        proxy_pass         http://backend:8000;
-        proxy_http_version 1.1;
-        proxy_set_header   Host $host;
-        proxy_set_header   X-Real-IP $remote_addr;
-        proxy_read_timeout 120s;
-    }
-
-    location /chat {
-        proxy_pass         http://backend:8000;
-        proxy_http_version 1.1;
-        proxy_set_header   Host $host;
-        proxy_read_timeout 120s;
-    }
-
-    location /admin/ {
-        proxy_pass         http://backend:8000;
-        proxy_http_version 1.1;
-        proxy_set_header   Host $host;
-        proxy_read_timeout 120s;
-    }
-
-    location /documents/ {
-        proxy_pass         http://backend:8000;
-        proxy_http_version 1.1;
-        proxy_set_header   Host $host;
-        proxy_read_timeout 120s;
-    }
-
+    # Health check — handled by nginx directly, no proxy
     location /health {
-        proxy_pass http://backend:8000;
+        return 200 '{"status":"ok","service":"Happiest Minds Knowledge Hub"}';
+        add_header Content-Type application/json;
     }
 
-    # React Router — serve index.html for all frontend routes
+    # All routes → React SPA
     location / {
         try_files $uri $uri/ /index.html;
     }
-
-    # Cache static assets
-    location ~* \.(js|css|png|jpg|ico|svg|woff2)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";
 }
 ```
+
+**Note:** No `proxy_pass` directives — on App Runner, frontend and backend run as
+separate services. The frontend calls the backend directly via `VITE_API_URL`
+(baked in at build time). The nginx config only serves static files and handles
+SPA routing.
 
 ---
 

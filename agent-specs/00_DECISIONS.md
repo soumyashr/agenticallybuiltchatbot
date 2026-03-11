@@ -85,8 +85,8 @@ Vite             : latest
 Styling          : Pure inline CSS — NO Tailwind, NO MUI, NO CSS files
 State            : React hooks only — NO Redux
 
-Docker base      : python:3.11-slim (arm64 compatible)
-Docker frontend  : node:20-alpine + nginx:alpine
+Docker base      : python:3.11-slim (amd64 — AWS App Runner / Cloud Shell)
+Docker frontend  : node:20-alpine + nginx:alpine (amd64)
 ```
 
 ---
@@ -185,18 +185,28 @@ and accessible to any authenticated user (used by sidebar for dynamic questions)
 │   │   ├── tools.py
 │   │   ├── ingest.py
 │   │   ├── document_store.py
+│   │   ├── guardrails.py
+│   │   ├── workflow_guard.py
+│   │   ├── feedback_store.py
+│   │   ├── escalation_store.py
 │   │   └── routers/
 │   │       ├── __init__.py      (empty)
 │   │       ├── auth_router.py
 │   │       ├── chat_router.py
-│   │       └── documents_router.py
+│   │       ├── documents_router.py
+│   │       └── feedback_router.py
 │   ├── tests/
 │   │   ├── __init__.py
-│   │   ├── test_agent_logic.py       (43 tests — agent retry, RBAC, chat endpoint)
+│   │   ├── test_agent_logic.py       (57 tests — agent retry, RBAC, chat endpoint, citations)
 │   │   ├── test_config.py            (4 tests — Settings defaults, Azure fields)
 │   │   ├── test_azure_integration.py (7 tests — Azure LLM, embeddings, search, ingest)
+│   │   ├── test_cors.py              (5 tests — CORS preflight and origin checks)
 │   │   ├── test_document_store.py    (15 tests — DynamoDB CRUD via moto)
-│   │   └── test_provider_switching.py(14 tests — AI_PROVIDER flag, FAISS vs Azure)
+│   │   ├── test_escalation.py        (10 tests — escalation store, agent logic, admin endpoint)
+│   │   ├── test_feedback.py          (12 tests — feedback store, endpoint, admin)
+│   │   ├── test_guardrails.py        (27 tests — layer 1/2 checks, integration, config)
+│   │   ├── test_provider_switching.py(14 tests — AI_PROVIDER flag, FAISS vs Azure)
+│   │   └── test_workflow_guard.py    (37 tests — form guidance, workflow prevention)
 │   ├── data/                    (empty dir, .gitkeep)
 │   ├── vector_store/            (empty dir, .gitkeep)
 │   ├── requirements.txt

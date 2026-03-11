@@ -72,7 +72,7 @@ Classify the user message as:
 | `backend/app/guardrails.py` | Core module: `check_layer1()`, `check_layer2()`, `run_guardrails()`, `GuardrailViolation` |
 | `backend/app/routers/chat_router.py` | Integration: calls `run_guardrails()` before agent, returns HTTP 400 on violation |
 | `backend/app/config.py` | Config: `guardrail_max_length`, `guardrail_layer2_enabled` |
-| `backend/tests/test_guardrails.py` | 21 tests across 4 test classes |
+| `backend/tests/test_guardrails.py` | 27 tests across 5 test classes |
 
 ---
 
@@ -109,11 +109,11 @@ reason `guardrail_layer1_blocked` or `guardrail_layer2_blocked`.
 
 Both layers use existing infrastructure:
 - Layer 1: Python stdlib (`re`, string matching)
-- Layer 2: Existing Azure OpenAI LLM (same `_build_llm()` as the agent)
+- Layer 2: Existing LLM (same `_build_llm()` as the agent — OpenAI or Azure OpenAI per AI_PROVIDER)
 
 ---
 
-## Test Coverage (21 tests)
+## Test Coverage (27 tests)
 
 | Class | Tests | Coverage |
 |-------|-------|----------|
@@ -121,6 +121,7 @@ Both layers use existing infrastructure:
 | TestLayer2LLMCheck | 5 | UNSAFE blocks, SAFE passes, LLM error fail-open, unexpected response, disabled skip |
 | TestGuardrailIntegration | 2 | Layer 1 blocks before Layer 2, both layers pass |
 | TestGuardrailConfig | 2 | Config defaults verified |
+| TestGuardrailEndpointIntegration | 6 | End-to-end guardrail blocking via chat endpoint |
 
 ## Jira Mapping
 

@@ -701,8 +701,8 @@ arn:aws:dynamodb:ap-south-1:*:table/hm-documents
 | UIB-35 | Provide citations and links only to authorized documents | 0 | ✅ Implemented |
 | UIB-40 | Filter to authorized documents only | 0 | ✅ Implemented |
 | UIB-44 | Neutral response when only restricted documents match | 0 | ✅ Implemented |
-| UIB-57 | Admin enables governed current/approved retrieval | 0 | ⚠️ Partial |
-| UIB-61 | Use only current, approved versions of documents | 0 | ⚠️ Partial |
+| UIB-57 | Admin enables governed current/approved retrieval | 0 | ❌ Pending |
+| UIB-61 | Use only current, approved versions of documents | 0 | ❌ Pending |
 | UIB-65 | Ignore drafts, archived, and superseded versions | 0 | ❌ Pending |
 | UIB-75 | Aggregate multiple relevant documents | 0 | ⚠️ Partial |
 | UIB-79 | Consolidate insights into one clear answer | 0 | ⚠️ Partial |

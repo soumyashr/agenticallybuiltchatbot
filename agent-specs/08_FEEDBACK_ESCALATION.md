@@ -252,7 +252,7 @@ startup. Tables were created manually via AWS CLI before redeploying successfull
 - [ ] Frontend 👍/👎 buttons appear on assistant messages
 - [ ] Clicking 👍 shows comment input and Submit button
 - [ ] Submitting feedback shows "Thanks for your feedback!"
-- [ ] `python3 -m pytest tests/ -v` — all 105 tests pass
+- [ ] `python3 -m pytest tests/ -v` — all 188 tests pass
 - [ ] `cd frontend && npm run build` — succeeds
 
 ## Jira Mapping

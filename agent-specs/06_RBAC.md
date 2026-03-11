@@ -211,7 +211,7 @@ All 9 must pass.
 |----------|-------|----|-----------------------|
 | UIB-40 | Filter to authorized documents only | 0 | ✅ Implemented |
 | UIB-44 | Neutral response when only restricted documents match | 0 | ✅ Implemented |
-| UIB-48 | Suggest safe next steps (optional, configurable) | 0 | ✅ Implemented |
+| UIB-48 | Suggest safe next steps (optional, configurable) | 0 | ❌ Pending |
 | UIB-52 | Do not reveal restricted titles, locations, snippets, or existence | 0 | ✅ Implemented |
 
 ### Source of Truth Rules

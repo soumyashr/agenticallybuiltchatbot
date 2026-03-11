@@ -218,7 +218,7 @@ RULE: App.jsx is pure wiring — no business logic, no fetch calls.
 | Story ID | Title | AC | Implementation Status |
 |----------|-------|----|-----------------------|
 | UIB-1 | Access chatbot widget from approved internal systems | 0 | ✅ Implemented |
-| UIB-3 | Seamless SSO-based access to chatbot | 0 | ✅ Implemented |
+| UIB-3 | Seamless SSO-based access to chatbot | 0 | ⚠️ Partial (JWT auth exists, no true SSO/SAML) |
 | UIB-23 | Retrieve from approved knowledge sources only | 0 | ✅ Implemented |
 | UIB-27 | Apply role/group-based permissions to filter results | 0 | ✅ Implemented |
 | UIB-40 | Filter to authorized documents only | 0 | ✅ Implemented |

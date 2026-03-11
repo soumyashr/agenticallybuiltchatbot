@@ -32,10 +32,12 @@ Deployed on AWS App Runner with IAM role apprunner-hm-instance-role.
 │   ├── 06_RBAC.md
 │   ├── 07_ADMIN_API.md
 │   ├── 08_FRONTEND.md
+│   ├── 08_FEEDBACK_ESCALATION.md
 │   ├── 09_DOCKER.md
+│   ├── 09_GUARDRAILS.md
 │   └── 10_AWS_DEPLOY.md
 ├── backend/              ← created by spec 03
-│   └── tests/            ← 83 tests across 5 files (see docs/TEST_RECORD.md)
+│   └── tests/            ← 188 tests across 11 files (see docs/TEST_RECORD.md)
 ├── frontend/             ← created by spec 08
 ├── docker/               ← created by spec 09
 └── docs/
@@ -150,11 +152,14 @@ No CSS files      : All styles in JSX style props
 POST   /auth/token              → JWT token
 POST   /chat                    → Agent answer (with retry/fallback)
 POST   /chat/clear              → Clear session memory
+POST   /feedback                → Submit feedback (any authenticated user)
 GET    /documents/my            → User's accessible documents (any role)
 GET    /admin/documents         → All documents (admin only)
 POST   /admin/documents/upload  → Upload PDF (admin only)
 POST   /admin/documents/ingest  → Ingest pending docs (admin only)
 DELETE /admin/documents/{id}    → Delete document (admin only)
+GET    /admin/feedback          → View all feedback (admin only)
+GET    /admin/escalations       → View all escalations (admin only)
 GET    /health                  → Liveness check
 ```
 

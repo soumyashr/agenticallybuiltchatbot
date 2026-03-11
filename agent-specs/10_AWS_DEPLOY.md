@@ -88,7 +88,7 @@ docker build --build-arg VITE_API_URL=https://<backend-url> ...
 ```
 This is consumed in `constants.js`:
 ```js
-export const API_BASE = import.meta.env.VITE_API_URL || '';
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 ```
 
 ### Stateless Container Limitation
@@ -99,7 +99,7 @@ on redeployment. However, document metadata now persists in DynamoDB
 
 CORS in `main.py` includes the App Runner URL:
 ```python
-allow_origins=[..., "https://c2cnjknssm.ap-south-1.awsapprunner.com"]
+allow_origins=[..., "https://gazfq7ai7a.ap-south-1.awsapprunner.com"]
 ```
 
 ---
@@ -236,14 +236,14 @@ aws_deploy() {
   ok "ECR login successful."
 
   log "Building backend image..."
-  docker build --platform linux/arm64 \
+  docker build --platform linux/amd64 \
     -f "$ROOT/docker/Dockerfile.backend" \
     -t "$BACKEND_IMG" "$ROOT"
   docker push "$BACKEND_IMG"
   ok "Backend pushed: $BACKEND_IMG"
 
   log "Building frontend image..."
-  docker build --platform linux/arm64 \
+  docker build --platform linux/amd64 \
     -f "$ROOT/docker/Dockerfile.frontend" \
     -t "$FRONTEND_IMG" "$ROOT"
   docker push "$FRONTEND_IMG"

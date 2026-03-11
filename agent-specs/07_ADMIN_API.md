@@ -287,11 +287,11 @@ app.include_router(documents_router.public_router,                  tags=["Docum
 |----------|-------|----|-----------------------|
 | UIB-188 | Role & Persona Management | 0 | ❌ Pending |
 | UIB-192 | Repository Connector Setup | 0 | ❌ Pending |
-| UIB-196 | Indexing & Sync Controls | 0 | ⚠️ Partial |
+| UIB-196 | Indexing & Sync Controls | 0 | ❌ Pending |
 | UIB-200 | Session & Experience Controls | 0 | ❌ Pending |
 | UIB-204 | Fallback & User Messaging | 0 | ❌ Pending |
 | UIB-208 | Escalation Routing & Notifications | 0 | ⚠️ Partial |
-| UIB-212 | Branding & UI Theming | 0 | ⚠️ Partial |
+| UIB-212 | Branding & UI Theming | 0 | ❌ Pending |
 | UIB-216 | Analytics & Logging Dashboard | 0 | ❌ Pending |
 | UIB-482 | Allowed File Formats & Content Processing | 0 | ❌ Pending |
 | UIB-487 | Connector Settings & Governance | 0 | ❌ Pending |

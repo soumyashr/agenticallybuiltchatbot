@@ -124,8 +124,8 @@ Swapping to a new client = change constants.js + upload new documents. Zero code
 | UIB-108 | Epic: Clarify Ambiguous or Broad Queries (UC-08) | 0 | ✅ Implemented |
 | UIB-122 | Epic: Handle No Matching Content (UC-09) | 0 | ✅ Implemented |
 | UIB-130 | Epic: Escalate Unanswered Queries (UC-10) | 0 | ✅ Implemented |
-| UIB-139 | Epic: Informational Guidance for Forms (UC-11) | 0 | ❌ Pending |
-| UIB-147 | Epic: Prevent Workflow Execution (UC-12) | 0 | ❌ Pending |
+| UIB-139 | Epic: Informational Guidance for Forms (UC-11) | 0 | ✅ Implemented |
+| UIB-147 | Epic: Prevent Workflow Execution (UC-12) | 0 | ✅ Implemented |
 | UIB-156 | Epic: Handle Irrelevant Queries (UC-13) | 0 | ✅ Implemented |
 | UIB-165 | Epic: Abuse & Security Guardrails (UC-14) | 0 | ✅ Implemented |
 | UIB-178 | Epic: Capture User Feedback (UC-15) | 0 | ✅ Implemented |
