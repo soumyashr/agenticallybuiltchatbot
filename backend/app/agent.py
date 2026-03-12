@@ -332,6 +332,44 @@ def _filter_sources_by_role(
     return allowed
 
 
+# ── UC-03 UIB-48: Safe next steps ─────────────────────────────
+
+_UNSAFE_NEXT_STEP_WORDS = (
+    "submit", "approve", "apply now", "click here",
+    "sign the form", "process my", "execute", "file the",
+)
+
+
+def _generate_next_steps(role: Role, is_fallback: bool) -> list[str]:
+    """
+    Return safe, role-specific next-step suggestions.
+    Only returns suggestions when the response is a fallback/not-found.
+    Returns [] when disabled, when response is not a fallback,
+    or when all suggestions are deemed unsafe.
+    """
+    if not settings.next_steps_enabled:
+        return []
+    if not is_fallback:
+        return []
+
+    role_suggestions = {
+        Role.student: settings.next_steps_student,
+        Role.faculty: settings.next_steps_faculty,
+        Role.admin: settings.next_steps_admin,
+    }
+    raw = role_suggestions.get(role, "")
+    if not raw:
+        return []
+
+    steps = [s.strip() for s in raw.split(",") if s.strip()]
+    # Safety filter: remove any suggestion containing workflow action words
+    safe_steps = [
+        s for s in steps
+        if not any(word in s.lower() for word in _UNSAFE_NEXT_STEP_WORDS)
+    ]
+    return safe_steps
+
+
 # ── Direct FAISS fallback ────────────────────────────────────
 
 async def _direct_faiss_search(
@@ -356,6 +394,7 @@ async def _direct_faiss_search(
             "reasoning_steps": 0,
             "fallback_used": True,
             "error_type": "retrieval_error",
+            "next_steps": _generate_next_steps(role, is_fallback=True),
         }
 
     if "Source:" not in search_result:
@@ -365,6 +404,7 @@ async def _direct_faiss_search(
             "reasoning_steps": 0,
             "fallback_used": True,
             "error_type": "no_match",
+            "next_steps": _generate_next_steps(role, is_fallback=True),
         }
 
     # Parse sources from the raw search result
@@ -404,12 +444,14 @@ async def _direct_faiss_search(
 
     safe_sources = _filter_sources_by_role(sources, role.value)
     safe_sources = _enrich_sources(safe_sources)
+    is_fb = _is_fallback_response(answer)
     return {
         "answer": answer,
         "sources": [s.dict() for s in safe_sources],
         "reasoning_steps": 1,
         "fallback_used": True,
         "error_type": None,
+        "next_steps": _generate_next_steps(role, is_fallback=is_fb),
     }
 
 
@@ -492,6 +534,7 @@ async def chat(
                     "reasoning_steps": len(intermediate),
                     "fallback_used":   False,
                     "error_type":      None,
+                    "next_steps":      _generate_next_steps(role, is_fallback=False),
                 }
 
             # Fallback phrase but FAISS actually ran — genuine not-found
@@ -506,6 +549,7 @@ async def chat(
                     "reasoning_steps": len(intermediate),
                     "fallback_used":   False,
                     "error_type":      None,
+                    "next_steps":      _generate_next_steps(role, is_fallback=True),
                 }
 
             # Fallback phrase and FAISS never ran — parse failure, retry

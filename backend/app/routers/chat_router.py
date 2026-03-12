@@ -84,6 +84,7 @@ async def chat_endpoint(
             role=user["role"],
             sources=[],
             reasoning_steps=0,
+            next_steps=[],
         )
 
     # ── Agent block — only reached if guardrail + workflow check passed ─

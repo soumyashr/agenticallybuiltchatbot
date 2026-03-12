@@ -40,6 +40,7 @@ class ChatResponse(BaseModel):
     role: str
     sources: list[SourceDoc]
     reasoning_steps: int
+    next_steps: list[str] = []
 
 
 class DocumentStatusResponse(BaseModel):

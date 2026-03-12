@@ -9,8 +9,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 250 |
-| Pass | 250 |
+| Total tests | 256 |
+| Pass | 256 |
 | Fail | 0 |
 | Test files | 10 |
 | Python | 3.11.9 |
@@ -310,7 +310,7 @@ cd backend && python3 -m pytest tests/test_document_store.py -v
 
 ## Known Issues
 
-None. All 250 tests pass for both AI_PROVIDER values.
+None. All 256 tests pass for both AI_PROVIDER values.
 
 ---
 
@@ -332,3 +332,13 @@ None. All 250 tests pass for both AI_PROVIDER values.
 | TestRetrieverPrecision | 2 | UIB-22-PRECISION | k=3 default, k<=3 guard |
 
 **Total new tests this session:** 30 (from 220 → 250)
+
+---
+
+## New Tests Added (2026-03-12 — UIB-48 safe next steps)
+
+| Class | Tests | AC Tags | Description |
+|-------|-------|---------|-------------|
+| TestSafeNextStepsUIB48 | 6 | UIB-48-AC1 through AC6 | next_steps field present, no unsafe words, empty when not fallback, role-specific, disabled toggle, always list[str] |
+
+**Total new tests this session:** 6 (from 250 → 256)

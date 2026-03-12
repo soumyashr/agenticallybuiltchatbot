@@ -829,3 +829,51 @@ into `chat_router.py`.
 - `test_workflow_patterns_loaded_as_list` (PROD3)
 - `test_workflow_detection_before_agent_full_path` (PROD4)
 - `test_workflow_patterns_parsed_from_comma_string` (PROD5)
+
+---
+
+## UIB-48 Safe Next Steps — 2026-03-12
+
+**Story:** UIB-48 — Suggest safe next steps (optional, configurable)
+**UC:** UC-03 (Enforce Document-Level Access Control)
+
+### What Changed
+
+1. **`config.py`** — Added 4 new settings:
+   - `next_steps_enabled: bool = True` — toggle feature on/off
+   - `next_steps_student: str` — comma-separated suggestions for students
+   - `next_steps_faculty: str` — comma-separated suggestions for faculty
+   - `next_steps_admin: str` — comma-separated suggestions for admins
+
+2. **`models.py`** — Added `next_steps: list[str] = []` to `ChatResponse`
+
+3. **`agent.py`** — Added `_generate_next_steps(role, is_fallback)`:
+   - Returns role-specific suggestions only on fallback/not-found responses
+   - Safety filter removes any suggestion containing workflow action words
+   - Returns `[]` when disabled or when response is not a fallback
+   - Wired into all return paths in `chat()` and `_direct_faiss_search()`
+
+4. **`chat_router.py`** — Workflow refusal response includes `next_steps=[]`
+
+### Safety Rules
+- Next steps are informational only — no workflow actions (submit, approve, etc.)
+- `_UNSAFE_NEXT_STEP_WORDS` tuple filters out any suggestion with action words
+- No conflict with UC-12: next steps suggest guidance, not actions
+- Role-specific: each role sees only suggestions appropriate to their access level
+
+### Config
+```env
+NEXT_STEPS_ENABLED=true
+NEXT_STEPS_STUDENT="Contact student support,...,Check with your academic advisor"
+NEXT_STEPS_FACULTY="Contact your department head,...,Reach out to the academic office"
+NEXT_STEPS_ADMIN="Review the document repository,...,Check the admin dashboard"
+```
+
+### Tests
+6 tests in `TestSafeNextStepsUIB48` class (`backend/tests/test_agent_logic.py`):
+- `test_next_steps_returned_in_response` (AC1)
+- `test_next_steps_are_safe_no_workflow_actions` (AC2)
+- `test_next_steps_empty_when_not_fallback` (AC3)
+- `test_next_steps_respect_rbac` (AC4)
+- `test_next_steps_disabled_when_config_false` (AC5)
+- `test_next_steps_are_list_of_strings` (AC6)

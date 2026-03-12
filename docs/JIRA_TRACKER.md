@@ -25,7 +25,7 @@ Last Updated: 2026-03-11 (audit pass #3 — full AC coverage)
 | UC-02 | UIB-22 | UIB-35 | Provide citations and links only to authorized documents | 0 | 16 | ✅ Done |
 | UC-03 | UIB-39 | UIB-40 | Filter to authorized documents only | 0 | 5 | ✅ Done |
 | UC-03 | UIB-39 | UIB-44 | Neutral response when only restricted documents match | 0 | 2 | ✅ Done |
-| UC-03 | UIB-39 | UIB-48 | Suggest safe next steps (optional, configurable) | 0 | 0 | ❌ Pending |
+| UC-03 | UIB-39 | UIB-48 | Suggest safe next steps (optional, configurable) | 0 | 6 | ✅ Done |
 | UC-03 | UIB-39 | UIB-52 | Do not reveal restricted titles, locations, snippets, or existence | 0 | 3 | ✅ Done |
 | UC-04 | UIB-56 | UIB-57 | Admin enables governed current/approved retrieval | 0 | 0 | ❌ Pending |
 | UC-04 | UIB-56 | UIB-61 | Use only current, approved versions of documents | 0 | 0 | ❌ Pending |
@@ -81,7 +81,7 @@ Last Updated: 2026-03-11 (audit pass #3 — full AC coverage)
 
 - **Tests** column = count of `# AC: UIB-XXX` tags found by `grep -rn` in `backend/tests/` (2026-03-11 audit pass #2)
 - **Additional 24 tests** tagged `# AC: INFRA` for provider switching, Azure integration, and config (not story-specific)
-- **Total tagged tests across all stories:** 211 (+ 24 INFRA = 235 tags across 250 tests)
+- **Total tagged tests across all stories:** 217 (+ 24 INFRA = 241 tags across 256 tests)
 - **All tests** now have AC tags
 - **UC-17 through UC-19** are additional epics beyond original UC-01 to UC-16 scope
 - **UIB-3** — JWT auth exists with 4 test tags, but no true SSO/SAML integration

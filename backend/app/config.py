@@ -99,6 +99,24 @@ class Settings(BaseSettings):
     guardrail_max_length: int = 2000
     guardrail_layer2_enabled: bool = True
 
+    # UC-03 UIB-48 Safe Next Steps
+    next_steps_enabled: bool = True
+    next_steps_student: str = (
+        "Contact student support for further assistance,"
+        "Visit the student portal for current information,"
+        "Check with your academic advisor"
+    )
+    next_steps_faculty: str = (
+        "Contact your department head for details,"
+        "Check the faculty resources page,"
+        "Reach out to the academic office for guidance"
+    )
+    next_steps_admin: str = (
+        "Review the document repository for related files,"
+        "Contact IT support for system-related queries,"
+        "Check the admin dashboard for configuration options"
+    )
+
     # Data
     data_dir: str = "data"
     vector_store_dir: str = "vector_store"

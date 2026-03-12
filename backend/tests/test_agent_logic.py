@@ -28,6 +28,8 @@ from app.agent import (
     _extract_sources,
     _filter_sources_by_role,
     _enrich_sources,
+    _generate_next_steps,
+    _UNSAFE_NEXT_STEP_WORDS,
     _is_session_expired,
     _cleanup_expired_sessions,
     _direct_faiss_search,
@@ -2187,3 +2189,78 @@ class TestWorkflowPreventionConfigUC12:
         from app.config import Settings
         field = Settings.model_fields.get("workflow_patterns")
         assert field is not None
+
+
+# ═══════════════════════════════════════════════════════════════
+# UIB-48: Suggest safe next steps (optional, configurable)
+# ═══════════════════════════════════════════════════════════════
+
+class TestSafeNextStepsUIB48:
+    """Tests for UC-03 UIB-48 — safe next-step suggestions on fallback responses."""
+
+    # AC: UIB-48-AC1 — next_steps field present in response
+    def test_next_steps_returned_in_response(self):
+        """ChatResponse model must include next_steps field (defaults to [])."""
+        from app.models import ChatResponse
+        resp = ChatResponse(
+            answer="test",
+            session_id="s1",
+            role="student",
+            sources=[],
+            reasoning_steps=0,
+        )
+        assert hasattr(resp, "next_steps")
+        assert isinstance(resp.next_steps, list)
+        assert resp.next_steps == []
+
+    # AC: UIB-48-AC2 — no unsafe workflow action words in next steps
+    def test_next_steps_are_safe_no_workflow_actions(self):
+        """Next steps must not contain workflow action words (UC-12 safety)."""
+        for role in [Role.student, Role.faculty, Role.admin]:
+            steps = _generate_next_steps(role, is_fallback=True)
+            for step in steps:
+                for word in _UNSAFE_NEXT_STEP_WORDS:
+                    assert word not in step.lower(), (
+                        f"Unsafe word '{word}' found in next step for {role.value}: '{step}'"
+                    )
+
+    # AC: UIB-48-AC3 — empty when not a fallback response
+    def test_next_steps_empty_when_not_fallback(self):
+        """Next steps should be empty when response is not a fallback."""
+        for role in [Role.student, Role.faculty, Role.admin]:
+            steps = _generate_next_steps(role, is_fallback=False)
+            assert steps == [], f"Expected empty next_steps for non-fallback, got {steps}"
+
+    # AC: UIB-48-AC4 — role-specific suggestions (RBAC)
+    def test_next_steps_respect_rbac(self):
+        """Each role gets different next-step suggestions."""
+        student_steps = _generate_next_steps(Role.student, is_fallback=True)
+        faculty_steps = _generate_next_steps(Role.faculty, is_fallback=True)
+        admin_steps = _generate_next_steps(Role.admin, is_fallback=True)
+
+        # All roles should have suggestions when enabled
+        assert len(student_steps) > 0
+        assert len(faculty_steps) > 0
+        assert len(admin_steps) > 0
+
+        # Suggestions should differ between roles
+        assert student_steps != faculty_steps, "Student and faculty next_steps should differ"
+        assert student_steps != admin_steps, "Student and admin next_steps should differ"
+
+    # AC: UIB-48-AC5 — disabled when config flag is false
+    def test_next_steps_disabled_when_config_false(self):
+        """When NEXT_STEPS_ENABLED=false, next_steps is always empty."""
+        with patch.object(settings, "next_steps_enabled", False):
+            for role in [Role.student, Role.faculty, Role.admin]:
+                steps = _generate_next_steps(role, is_fallback=True)
+                assert steps == [], f"Expected empty when disabled, got {steps}"
+
+    # AC: UIB-48-AC6 — always returns list of strings
+    def test_next_steps_are_list_of_strings(self):
+        """next_steps must always be a list of strings, never None or dict."""
+        for role in [Role.student, Role.faculty, Role.admin]:
+            for is_fb in [True, False]:
+                steps = _generate_next_steps(role, is_fallback=is_fb)
+                assert isinstance(steps, list), f"Expected list, got {type(steps)}"
+                for s in steps:
+                    assert isinstance(s, str), f"Expected str, got {type(s)}"
