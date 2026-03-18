@@ -14,6 +14,11 @@ from app.models import Role, SourceDoc
 from app.tools import make_search_tools
 from app.escalation_store import save_escalation
 from app.document_store import get_allowed_roles_map, get_document_metadata_map
+from app.pre_process import (
+    is_ambiguous_query,
+    generate_clarification_questions,
+    CLARIFICATION_RESPONSE_TEMPLATE,
+)
 
 log = logging.getLogger(__name__)
 
@@ -395,6 +400,8 @@ async def _direct_faiss_search(
             "fallback_used": True,
             "error_type": "retrieval_error",
             "next_steps": _generate_next_steps(role, is_fallback=True),
+            "is_clarification": False,
+            "clarification_options": [],
         }
 
     if "Source:" not in search_result:
@@ -405,6 +412,8 @@ async def _direct_faiss_search(
             "fallback_used": True,
             "error_type": "no_match",
             "next_steps": _generate_next_steps(role, is_fallback=True),
+            "is_clarification": False,
+            "clarification_options": [],
         }
 
     # Parse sources from the raw search result
@@ -452,6 +461,8 @@ async def _direct_faiss_search(
         "fallback_used": True,
         "error_type": None,
         "next_steps": _generate_next_steps(role, is_fallback=is_fb),
+        "is_clarification": False,
+        "clarification_options": [],
     }
 
 
@@ -501,6 +512,34 @@ async def chat(
     Retries on agent parse failures up to MAX_AGENT_RETRIES times.
     Falls back to direct FAISS search if all retries are exhausted.
     """
+    # ── UC-08: clarification short-circuit ──────────────────────
+    if is_ambiguous_query(message):
+        try:
+            questions = generate_clarification_questions(
+                query=message,
+                role=role.value,
+            )
+            if questions and len(questions) >= 2:
+                answer = CLARIFICATION_RESPONSE_TEMPLATE.format(
+                    option_1=questions[0],
+                    option_2=questions[1],
+                )
+                return {
+                    "answer":                answer,
+                    "session_id":            session_id,
+                    "role":                  role.value,
+                    "sources":               [],
+                    "reasoning_steps":       0,
+                    "fallback_used":         False,
+                    "error_type":            None,
+                    "next_steps":            [],
+                    "is_clarification":      True,
+                    "clarification_options": questions,
+                }
+        except Exception as e:
+            log.warning("Clarification generation failed: %s. "
+                        "Falling through to normal agent.", e)
+
     executor = get_or_create_session(session_id, role)
 
     last_answer = None
@@ -527,14 +566,16 @@ async def chat(
                 safe_sources = _filter_sources_by_role(sources, role.value)
                 safe_sources = _enrich_sources(safe_sources)
                 return {
-                    "answer":          answer,
-                    "session_id":      session_id,
-                    "role":            role.value,
-                    "sources":         [s.dict() for s in safe_sources],
-                    "reasoning_steps": len(intermediate),
-                    "fallback_used":   False,
-                    "error_type":      None,
-                    "next_steps":      _generate_next_steps(role, is_fallback=False),
+                    "answer":               answer,
+                    "session_id":           session_id,
+                    "role":                 role.value,
+                    "sources":              [s.dict() for s in safe_sources],
+                    "reasoning_steps":      len(intermediate),
+                    "fallback_used":        False,
+                    "error_type":           None,
+                    "next_steps":           _generate_next_steps(role, is_fallback=False),
+                    "is_clarification":     False,
+                    "clarification_options": [],
                 }
 
             # Fallback phrase but FAISS actually ran — genuine not-found
@@ -542,14 +583,16 @@ async def chat(
             # (UIB-44, UIB-52)
             if _has_sources(intermediate):
                 return {
-                    "answer":          answer,
-                    "session_id":      session_id,
-                    "role":            role.value,
-                    "sources":         [],
-                    "reasoning_steps": len(intermediate),
-                    "fallback_used":   False,
-                    "error_type":      None,
-                    "next_steps":      _generate_next_steps(role, is_fallback=True),
+                    "answer":               answer,
+                    "session_id":           session_id,
+                    "role":                 role.value,
+                    "sources":              [],
+                    "reasoning_steps":      len(intermediate),
+                    "fallback_used":        False,
+                    "error_type":           None,
+                    "next_steps":           _generate_next_steps(role, is_fallback=True),
+                    "is_clarification":     False,
+                    "clarification_options": [],
                 }
 
             # Fallback phrase and FAISS never ran — parse failure, retry

@@ -35,7 +35,7 @@ function AppShell() {
         <Header activeTab={activeTab} onTabChange={setActiveTab} isAdmin={isAdmin} />
         {activeTab === 'chat' ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <MessageList messages={messages} loading={chatLoading} bottomRef={bottomRef} auth={auth} sessionId={sessionId} token={auth.token} />
+            <MessageList messages={messages} loading={chatLoading} bottomRef={bottomRef} auth={auth} sessionId={sessionId} token={auth.token} onSend={send} />
             <ChatInput onSend={send} disabled={chatLoading} />
           </div>
         ) : (

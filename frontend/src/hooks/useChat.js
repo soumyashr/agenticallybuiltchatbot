@@ -34,12 +34,14 @@ export function useChat(token) {
     try {
       const data = await sendMessage(token, text, sessionId);
       const aiMsg = {
-        id:             Date.now() + 1,
-        role:           'assistant',
-        content:        data.answer,
-        sources:        data.sources        || [],
-        reasoningSteps: data.reasoning_steps ?? 0,
-        userQuery:      text,
+        id:                    Date.now() + 1,
+        role:                  'assistant',
+        content:               data.answer,
+        sources:               data.sources               || [],
+        reasoningSteps:        data.reasoning_steps        ?? 0,
+        userQuery:             text,
+        isClarification:       data.is_clarification       || false,
+        clarificationOptions:  data.clarification_options  || [],
       };
       setMessages(prev => [...prev, aiMsg]);
     } catch (err) {

@@ -41,6 +41,8 @@ class ChatResponse(BaseModel):
     sources: list[SourceDoc]
     reasoning_steps: int
     next_steps: list[str] = []
+    is_clarification: bool = False
+    clarification_options: list[str] = []
 
 
 class DocumentStatusResponse(BaseModel):

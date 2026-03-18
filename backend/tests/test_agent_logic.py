@@ -42,6 +42,7 @@ from app.agent import (
     AgentParseError,
     AgentRetrievalError,
 )
+from app.pre_process import is_ambiguous_query, generate_clarification_questions
 from app.auth import create_token, decode_token
 
 
@@ -2264,3 +2265,98 @@ class TestSafeNextStepsUIB48:
                 assert isinstance(steps, list), f"Expected list, got {type(steps)}"
                 for s in steps:
                     assert isinstance(s, str), f"Expected str, got {type(s)}"
+
+
+# ── UC-08: Ambiguous Query Detection Tests ────────────────────
+
+
+class TestAmbiguousQueryDetection:
+    """Tests for UC-08 — ambiguous/broad query detection and clarification."""
+
+    # AC: UIB-113 — short vague query flagged
+    def test_short_query_flagged(self):
+        """Short vague queries with broad terms and no specific noun → flagged."""
+        assert is_ambiguous_query("tell me about docs") is True
+        assert is_ambiguous_query("explain this") is True
+        assert is_ambiguous_query("show me stuff") is True
+
+    # AC: UIB-113 — specific query not flagged
+    def test_specific_query_not_flagged(self):
+        """Specific question with enough detail should NOT be flagged."""
+        assert is_ambiguous_query(
+            "What are the assessment criteria for CS405?"
+        ) is False
+
+    # AC: UIB-113 — broad term triggers when combined with other conditions
+    def test_broad_term_flagged(self):
+        """Query with broad term + short + no specific noun → flagged."""
+        assert is_ambiguous_query("tell me about docs") is True
+        assert is_ambiguous_query("explain this") is True
+        assert is_ambiguous_query("what is the topic") is True
+
+    # AC: UIB-113 — reasonable specific query not flagged
+    def test_reasonable_query_not_flagged(self):
+        """Longer specific query should NOT be flagged."""
+        assert is_ambiguous_query(
+            "What is the deadline for assignment submission in CS405?"
+        ) is False
+
+    # AC: UIB-117 — clarification options are role-safe
+    @patch("app.pre_process.get_allowed_roles_map")
+    def test_clarification_response_is_role_safe(self, mock_roles_map):
+        """Student must never see admin-only or faculty-only document names."""
+        mock_roles_map.return_value = {
+            "Feature2_CS405_Syllabus.pdf": ["admin", "faculty", "student"],
+            "Feature_6_Curriculum_Design_Blueprint.pdf": ["admin", "faculty"],
+            "Feature_7_Faculty_Senate_Minutes.pdf": ["admin"],
+            "Feature_8_Tier_4_Restricted_Data_Protocol.pdf": ["admin"],
+        }
+        options = generate_clarification_questions(
+            query="tell me about docs",
+            role="student",
+        )
+        assert len(options) == 2
+        joined = " ".join(options).lower()
+        assert "senate" not in joined
+        assert "restricted" not in joined
+        assert "tier 4" not in joined
+
+    # AC: UIB-117 — response shape consistency
+    @patch("app.agent._create_executor")
+    @patch("app.pre_process.get_allowed_roles_map")
+    def test_response_shape_always_consistent(self, mock_roles_map, mock_create):
+        """Both clarification and normal responses must have
+        is_clarification and clarification_options fields."""
+        # Set up roles map for clarification path
+        mock_roles_map.return_value = {
+            "Feature2_CS405_Syllabus.pdf": ["admin", "faculty", "student"],
+            "Feature_5_Academic_Operations_Manual.pdf": ["admin", "faculty"],
+        }
+
+        # Test clarification response
+        clarification_result = asyncio.get_event_loop().run_until_complete(
+            agent_chat("explain this", "uc08-shape-1", Role.student)
+        )
+        assert "is_clarification" in clarification_result
+        assert "clarification_options" in clarification_result
+        assert clarification_result["is_clarification"] is True
+
+        # Test normal response
+        executor = MagicMock()
+        executor.invoke.return_value = {
+            "output": "Here is the detailed answer about CS405.",
+            "intermediate_steps": [],
+        }
+        mock_create.return_value = executor
+
+        normal_result = asyncio.get_event_loop().run_until_complete(
+            agent_chat(
+                "What are the assessment criteria for CS405?",
+                "uc08-shape-2",
+                Role.student,
+            )
+        )
+        assert "is_clarification" in normal_result
+        assert "clarification_options" in normal_result
+        assert normal_result["is_clarification"] is False
+        assert normal_result["clarification_options"] == []

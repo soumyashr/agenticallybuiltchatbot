@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { THEME } from '../../config/theme';
 import { submitFeedback } from '../../services/api';
 
-export default function MessageBubble({ message, userInitial, sessionId, token }) {
+export default function MessageBubble({ message, userInitial, sessionId, token, onSend }) {
   const [showSources, setShowSources] = useState(false);
   const [feedbackState, setFeedbackState] = useState('idle'); // idle | selected | submitted
   const [selectedRating, setSelectedRating] = useState(null);
   const [comment, setComment] = useState('');
   const [hovered, setHovered] = useState(null); // 'up' | 'down'
+  const [chipsVisible, setChipsVisible] = useState(true);
 
   const isUser      = message.role === 'user';
   const isError     = message.role === 'error';
@@ -71,6 +72,32 @@ export default function MessageBubble({ message, userInitial, sessionId, token }
           fontSize: 14, lineHeight: 1.7,
           whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         }}>{message.content}</div>
+
+        {/* Clarification chips (UC-08) */}
+        {message.isClarification && chipsVisible && message.clarificationOptions?.length >= 2 && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+            {message.clarificationOptions.map((option, i) => (
+              <button
+                key={i}
+                onClick={() => { setChipsVisible(false); onSend?.(option); }}
+                style={{
+                  background: '#009797',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 16,
+                  padding: '6px 14px',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontFamily: 'inherit',
+                  fontWeight: 500,
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              >{option}</button>
+            ))}
+          </div>
+        )}
 
         {/* Footer bar */}
         {(hasSources || hasSteps) && (
